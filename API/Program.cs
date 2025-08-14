@@ -1,7 +1,9 @@
+using System;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
-
+using API.DBContext;
 namespace API;
 
 public class Program
@@ -9,6 +11,14 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        IConfiguration Configuration = builder.Configuration;
+
+        string connectionString = Configuration.GetConnectionString("DefaultConnection")
+        ?? Environment.GetEnvironmentVariable("DefaultConnection");
+
+        builder.Services.AddDbContext<AppDBContext>(options =>
+                options.UseNpgsql(connectionString));
 
         // Add services to the container.
         builder.Services.AddControllers();
