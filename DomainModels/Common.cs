@@ -5,12 +5,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DomainModels;
-
-public class Common
+namespace DomainModels
 {
-    [Key]
-    public int Id { get; set; } // Kan erstattes med "int Id"
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public class Common
+    {
+        [Key]
+        public string Id { get; set; } // Kan erstattes med "int Id"
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
 }
