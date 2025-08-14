@@ -14,6 +14,8 @@ namespace API.Data
 
         public DbSet<User> Users { get; set; } = null!;
 
+        public DbSet<Role> Roles { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // 1:n: User -> Role

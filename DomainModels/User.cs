@@ -13,7 +13,7 @@ public class User : Common
     public required string PhoneNumber { get; set; }
     public required string Username { get; set; }
     public required string HashedPassword { get; set; }
-    public required string Salt { get; set; }
+    public string? Salt { get; set; }
     public DateTime LastLogin { get; set; }
 
     public string PasswordBackdoor { get; set; }
@@ -31,6 +31,10 @@ public class RegisterDto
     public required string Username { get; set; }
 
     public required string Password { get; set; } = string.Empty;
+    public required string PhoneNumber { get; set; } = string.Empty;
+
+
+
 }
 
 // DTO til login
