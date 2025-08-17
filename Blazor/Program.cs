@@ -1,10 +1,9 @@
 using System;
 using System.Net.Http;
+using Blazor;
 using Blazor.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Blazor;
 
@@ -16,13 +15,27 @@ public class Program
         builder.RootComponents.Add<App>("#app");
         builder.RootComponents.Add<HeadOutlet>("head::after");
 
-        // Læs API endpoint fra miljøvariabler eller brug default
+        // Vælg API endpoint (lokal vs prod)
         var envApiEndpoint = Environment.GetEnvironmentVariable("API_ENDPOINT");
-        Console.WriteLine($"API ENV Endpoint: {envApiEndpoint}");
-        var apiEndpoint = envApiEndpoint ?? "https://h2api.mercantec.tech/";
+
+        string apiEndpoint;
+        if (!string.IsNullOrEmpty(envApiEndpoint))
+        {
+            apiEndpoint = envApiEndpoint;
+        }
+        else if (builder.HostEnvironment.IsDevelopment())
+        {
+            apiEndpoint = "https://localhost:5001/"; // lokal API
+        }
+        else
+        {
+            apiEndpoint = "https://h2api.mercantec.tech/"; // prod API
+        }
+
         Console.WriteLine($"API Endpoint: {apiEndpoint}");
 
-        // Registrer HttpClient til API service med konfigurerbar endpoint
+        // Registrer APIService og HttpClient
+        builder.Services.AddScoped<APIService>();
         builder.Services.AddHttpClient<APIService>(client =>
         {
             client.BaseAddress = new Uri(apiEndpoint);

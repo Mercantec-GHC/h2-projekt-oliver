@@ -1,97 +1,88 @@
-using System;
-using System.Reflection;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
-using Scalar.AspNetCore;
 using API.Data;
-namespace API;
+using API.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
-public class Program
+var builder = WebApplication.CreateBuilder(args);
+
+// Database
+builder.Services.AddDbContext<AppDBContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Tilføj controllers
+builder.Services.AddControllers();
+
+// JWT Config
+var jwtKey = builder.Configuration["Jwt:SecretKey"]
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+    ?? "DerVarEngangEnHestDerHedDortheOgDenHavdeDiarreOgElskedeAtBliveNusset123123123";
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? Environment.GetEnvironmentVariable("JWT_ISSUER")
+    ?? "H2-2025-API";
+
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE")
+    ?? "H2-2025-Client";
+
+var key = Encoding.UTF8.GetBytes(jwtKey);
+
+builder.Services.AddAuthentication(options =>
 {
-    public static void Main(string[] args)
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        var builder = WebApplication.CreateBuilder(args);
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(key)
+    };
+});
 
-        IConfiguration Configuration = builder.Configuration;
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigins", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:5085",
+                "http://localhost:8052",
+                "https://h2.mercantec.tech",
+                "https://localhost:53617" // Blazor WASM port
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .WithExposedHeaders("Content-Disposition");
+    });
+});
 
-        string connectionString = Configuration.GetConnectionString("DefaultConnection")
-        ?? Environment.GetEnvironmentVariable("DefaultConnection");
+// Services
+builder.Services.AddScoped<JwtService>();
 
-        builder.Services.AddDbContext<AppDBContext>(options =>
-                options.UseNpgsql(connectionString));
+var app = builder.Build();
 
-        // Add services to the container.
-        builder.Services.AddControllers();
-
-        // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-        builder.Services.AddSwaggerGen(c =>
-        {
-            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-            if (File.Exists(xmlPath))
-            {
-                c.IncludeXmlComments(xmlPath);
-            }
-        });
-
-        // Tilføj CORS for specifikke Blazor WASM domæner
-        builder.Services.AddCors(options =>
-        {
-            options.AddPolicy(
-                "AllowSpecificOrigins",
-                builder =>
-                {
-                    builder
-                        .WithOrigins(
-                            "http://localhost:5085",
-                            "http://localhost:8052",
-                            "https://h2.mercantec.tech"
-                        )
-                        .AllowAnyMethod()
-                        .AllowAnyHeader()
-                        .WithExposedHeaders("Content-Disposition");
-                }
-            );
-        });
-
-        // Tilføj basic health checks
-        builder.Services.AddHealthChecks()
-            .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), ["live"]);
-
-        var app = builder.Build();
-
-        // Brug CORS - skal være før anden middleware
-        app.UseCors("AllowSpecificOrigins");
-
-        // Map health checks
-        app.MapHealthChecks("/health");
-        app.MapHealthChecks("/alive", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
-        {
-            Predicate = r => r.Tags.Contains("live")
-        });
-
-        app.MapOpenApi();
-
-        // Scalar Middleware for OpenAPI
-        app.MapScalarApiReference(options =>
-        {
-            options
-                .WithTitle("MAGSLearn")
-                .WithTheme(ScalarTheme.Mars)
-                .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
-        });
-
-        // Map the Swagger UI
-        app.UseSwagger();
-        app.UseSwaggerUI(options =>
-        {
-            options.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
-        });
-
-        app.UseAuthorization();
-
-        app.MapControllers();
-
-        app.Run();
-    }
+// Middleware
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
 }
+
+app.UseHttpsRedirection();
+
+app.UseCors("AllowSpecificOrigins");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
