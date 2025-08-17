@@ -5,8 +5,7 @@ namespace API.Data
 {
     public class AppDBContext : DbContext
     {
-        public AppDBContext(DbContextOptions<AppDBContext> options)
-            : base(options) { }
+        public AppDBContext(DbContextOptions<AppDBContext> options) : base(options) { }
 
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
@@ -17,7 +16,6 @@ namespace API.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Relationships
             modelBuilder.Entity<User>()
                 .HasOne(u => u.Role)
                 .WithMany(r => r.Users)
@@ -34,10 +32,9 @@ namespace API.Data
                 .WithMany(r => r.Bookings)
                 .HasForeignKey(b => b.RoomId);
 
-            // Fixed date for seeding
-            var staticDate = new DateTime(2025, 1, 1);
+            // roles + dato
+            var staticDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-            // Seed Roles
             modelBuilder.Entity<Role>().HasData(
                 new Role { Id = 1, Name = "Admin", CreatedAt = staticDate, UpdatedAt = staticDate },
                 new Role { Id = 2, Name = "Manager", CreatedAt = staticDate, UpdatedAt = staticDate },
@@ -45,14 +42,14 @@ namespace API.Data
                 new Role { Id = 4, Name = "Cleaner", CreatedAt = staticDate, UpdatedAt = staticDate }
             );
 
-            // Seed 400 Rooms
+            // Værelser
             var rooms = new List<Room>();
             for (int i = 1; i <= 400; i++)
             {
                 rooms.Add(new Room
                 {
                     Id = i,
-                    RoomNumber = i, // Make sure Room model has this property
+                    RoomNumber = i,
                     Type = "Standard",
                     IsAvailable = true,
                     CreatedAt = staticDate,

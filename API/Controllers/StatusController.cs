@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using API.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
@@ -6,47 +8,39 @@ namespace API.Controllers
     [Route("api/[controller]")]
     public class StatusController : ControllerBase
     {
-        /// <summary>
-        /// Tjekker om API'en kører korrekt.
-        /// </summary>
-        /// <returns>Status og besked om API'ens tilstand.</returns>
-        /// <response code="200">API'en er kørende.</response>
+        private readonly AppDBContext _db;
+
+        public StatusController(AppDBContext db)
+        {
+            _db = db;
+        }
+
+        /// Tjekker om API kører
         [HttpGet("healthcheck")]
         public IActionResult HealthCheck()
         {
             return Ok(new { status = "OK", message = "API'en er kørende!" });
         }
 
-        /// <summary>
-        /// Tjekker om databasen er tilgængelig (dummy indtil EFCore er sat op).
-        /// </summary>
-        /// <returns>Status og besked om databaseforbindelse.</returns>
-        /// <response code="200">Database er kørende eller fejlbesked gives.</response>
-    
+        /// Tjekker om databasen er tilgængelig (EF Core)
         [HttpGet("dbhealthcheck")]
-        public IActionResult DBHealthCheck()
+        public async Task<IActionResult> DBHealthCheck()
         {
-            // Indtil vi har opsat EFCore, returnerer vi bare en besked
+            try
+            {
+                var canConnect = await _db.Database.CanConnectAsync();
+                if (canConnect)
+                    return Ok(new { status = "OK", message = "Database er kørende!" });
 
-            try {
-                // using (var context = new ApplicationDbContext())
-                // {
-                //     context.Database.CanConnect();
-                // }
-                throw new Exception("I har endnu ikke lært at opsætte EFCore! Det kommer senere!");
+                return StatusCode(500, new { status = "Error", message = "Kan ikke forbinde til databasen." });
             }
             catch (Exception ex)
             {
-                return Ok(new { status = "Error", message = "Fejl ved forbindelse til database: " + ex.Message });
+                return StatusCode(500, new { status = "Error", message = "Fejl ved forbindelse til database: " + ex.Message });
             }
-            return Ok(new { status = "OK", message = "Database er kørende!" });
         }
 
-        /// <summary>
-        /// Simpelt ping-endpoint til at teste API'en.
-        /// </summary>
-        /// <returns>Status og "Pong" besked.</returns>
-        /// <response code="200">API'en svarede med Pong.</response>
+        /// Simpelt ping-endpoint til test af API
         [HttpGet("ping")]
         public IActionResult Ping()
         {

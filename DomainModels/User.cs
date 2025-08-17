@@ -18,8 +18,7 @@ namespace DomainModels;
         public required string HashedPassword { get; set; }
         public DateTime LastLogin { get; set; }
 
-        // ❌ PasswordBackdoor should NOT be used in real life, 
-        // but if required for your assignment, keep it
+
         public string PasswordBackdoor { get; set; } = string.Empty;
 
         // Role
