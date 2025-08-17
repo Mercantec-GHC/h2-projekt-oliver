@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Linq;
 using System.Text;
@@ -7,39 +8,32 @@ using System.Threading.Tasks;
 
 namespace DomainModels;
 
-public class User : Common
-{
-    public required string Email { get; set; }
-    public required string PhoneNumber { get; set; }
-    public required string Username { get; set; }
-    public required string HashedPassword { get; set; }
-    public string? Salt { get; set; }
-    public DateTime LastLogin { get; set; }
 
-    public string PasswordBackdoor { get; set; }
-    
-    // FK + navigation til rolle (én rolle pr. bruger)
-    public string RoleId { get; set; } = default!;  // navigation 
-    public Role Role { get; set; } = default!;
 
-}
+    public class User : Common
+    {
+        public required string Email { get; set; }
+        public required string PhoneNumber { get; set; }
+        public required string Username { get; set; }
+        public required string HashedPassword { get; set; }
+        public DateTime LastLogin { get; set; }
 
-// DTO til registrering
-public class RegisterDto
-{
-    public required string Email { get; set; } = string.Empty;
-    public required string Username { get; set; }
+        // ❌ PasswordBackdoor should NOT be used in real life, 
+        // but if required for your assignment, keep it
+        public string PasswordBackdoor { get; set; } = string.Empty;
 
-    public required string Password { get; set; } = string.Empty;
-    public required string PhoneNumber { get; set; } = string.Empty;
+        // Role
+        public int RoleId { get; set; }
+        public Role Role { get; set; } = default!;
+
+        // Navigation
+        public List<Booking> Bookings { get; set; } = new();
+    }
 
 
 
-}
 
-// DTO til login
-public class LoginDto
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}
+
+
+
+
