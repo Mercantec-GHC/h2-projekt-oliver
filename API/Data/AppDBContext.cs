@@ -16,6 +16,7 @@ namespace API.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Relations
             modelBuilder.Entity<User>()
                 .HasOne(u => u.Role)
                 .WithMany(r => r.Users)
@@ -32,7 +33,7 @@ namespace API.Data
                 .WithMany(r => r.Bookings)
                 .HasForeignKey(b => b.RoomId);
 
-            // roles + dato
+            // Seed: roller + værelser (+ valgfri admin-bruger)
             var staticDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
             modelBuilder.Entity<Role>().HasData(
@@ -42,7 +43,6 @@ namespace API.Data
                 new Role { Id = 4, Name = "Cleaner", CreatedAt = staticDate, UpdatedAt = staticDate }
             );
 
-            // Værelser
             var rooms = new List<Room>();
             for (int i = 1; i <= 400; i++)
             {
@@ -57,6 +57,22 @@ namespace API.Data
                 });
             }
             modelBuilder.Entity<Room>().HasData(rooms);
+
+            // (Valgfri) admin-bruger til test
+            var adminId = 1;
+            modelBuilder.Entity<User>().HasData(new User
+            {
+                Id = adminId,
+                Email = "admin@hotel.test",
+                Username = "Admin",
+                PhoneNumber = "00000000",
+                HashedPassword = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
+                PasswordBackdoor = "Admin123!",
+                RoleId = 1,
+                CreatedAt = staticDate,
+                UpdatedAt = staticDate,
+                LastLogin = staticDate
+            });
         }
     }
 }

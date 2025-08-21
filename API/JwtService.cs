@@ -6,7 +6,7 @@ using DomainModels;
 
 namespace API.Services
 {
-    /// Oprettelse JWT Tokens
+    /// <summary>Opretter og signer JWT tokens.</summary>
     public class JwtService
     {
         private readonly string _secretKey;

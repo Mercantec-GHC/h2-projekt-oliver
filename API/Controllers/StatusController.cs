@@ -4,35 +4,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Simple status/health-endpoints til monitorering.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class StatusController : ControllerBase
     {
         private readonly AppDBContext _db;
+        public StatusController(AppDBContext db) => _db = db;
 
-        public StatusController(AppDBContext db)
-        {
-            _db = db;
-        }
-
-        /// Tjekker om API kører
+        /// <summary>Returnerer OK hvis API’et kører.</summary>
         [HttpGet("healthcheck")]
-        public IActionResult HealthCheck()
-        {
-            return Ok(new { status = "OK", message = "API'en er kørende!" });
-        }
+        public IActionResult HealthCheck() => Ok(new { status = "OK", message = "API'en er kørende!" });
 
-        /// Tjekker om databasen er tilgængelig (EF Core)
+        /// <summary>Tester DB-forbindelse via EF Core.</summary>
         [HttpGet("dbhealthcheck")]
         public async Task<IActionResult> DBHealthCheck()
         {
             try
             {
                 var canConnect = await _db.Database.CanConnectAsync();
-                if (canConnect)
-                    return Ok(new { status = "OK", message = "Database er kørende!" });
-
-                return StatusCode(500, new { status = "Error", message = "Kan ikke forbinde til databasen." });
+                return canConnect
+                    ? Ok(new { status = "OK", message = "Database er kørende!" })
+                    : StatusCode(500, new { status = "Error", message = "Kan ikke forbinde til databasen." });
             }
             catch (Exception ex)
             {
@@ -40,11 +35,8 @@ namespace API.Controllers
             }
         }
 
-        /// Simpelt ping-endpoint til test af API
+        /// <summary>Simpelt ping-endpoint.</summary>
         [HttpGet("ping")]
-        public IActionResult Ping()
-        {
-            return Ok(new { status = "OK", message = "Pong 🏓" });
-        }
+        public IActionResult Ping() => Ok(new { status = "OK", message = "Pong 🏓" });
     }
 }

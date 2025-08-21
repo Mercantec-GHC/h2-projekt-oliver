@@ -1,16 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace DomainModels;
 
 public class RegisterDto
 {
+    [Required, EmailAddress]
     public required string Email { get; set; }
+
+    [Required, MinLength(2)]
     public required string Username { get; set; }
+
+    [Required, MinLength(6)]
     public required string Password { get; set; }
+
+    [Required, Phone]
     public required string PhoneNumber { get; set; }
 }
-

@@ -5,9 +5,13 @@ using System.Security.Claims;
 using API.Data;
 using API.Services;
 using DomainModels;
+using System.Text.Json.Serialization;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Brugerstyring (registrering/login/me).
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
@@ -21,13 +25,15 @@ namespace API.Controllers
             _jwt = jwt;
         }
 
-        /// Registrerer en ny bruger. Adgangskoden hashes m. BCrypt
+        /// <summary>Opretter en ny bruger.</summary>
         [HttpPost("register")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var emailExists = await _db.Users.AnyAsync(u => u.Email == dto.Email);
+            var emailExists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email == dto.Email);
             if (emailExists) return BadRequest(new { message = "En bruger med denne e-mail findes allerede." });
 
             var now = DateTime.UtcNow;
@@ -38,8 +44,8 @@ namespace API.Controllers
                 Username = dto.Username.Trim(),
                 PhoneNumber = dto.PhoneNumber.Trim(),
                 HashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                PasswordBackdoor = dto.Password, // behold kun hvis opgaven kræver det
-                RoleId = 3, // Customer default
+                PasswordBackdoor = dto.Password, // kun til opgave/test – gemmes men skjules i JSON
+                RoleId = 3, // Customer
                 CreatedAt = now,
                 UpdatedAt = now,
                 LastLogin = now
@@ -48,16 +54,13 @@ namespace API.Controllers
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
 
-            
-            return Ok(new
-            {
-                message = "Bruger oprettet!",
-                user = new { user.Id, user.Email, user.Username, user.RoleId }
-            });
+            return Ok(new { message = "Bruger oprettet!", user = new { user.Id, user.Email, user.Username, user.RoleId } });
         }
 
-        /// Logger ind - udsteder JWT token
+        /// <summary>Login – returnerer JWT.</summary>
         [HttpPost("login")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == dto.Email);
@@ -73,26 +76,19 @@ namespace API.Controllers
             return Ok(new
             {
                 token,
-                user = new
-                {
-                    user.Id,
-                    user.Email,
-                    user.Username,
-                    role = user.Role?.Name ?? "Customer"
-                }
+                user = new { user.Id, user.Email, user.Username, role = user.Role?.Name ?? "Customer" }
             });
         }
 
-        
+        /// <summary>Returnerer info om den aktuelle bruger.</summary>
         [Authorize]
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
             var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("userId");
-            if (string.IsNullOrWhiteSpace(idClaim) || !int.TryParse(idClaim, out var userId))
-                return Unauthorized();
+            if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
 
-            var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == userId);
+            var user = await _db.Users.Include(u => u.Role).AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return NotFound();
 
             return Ok(new
