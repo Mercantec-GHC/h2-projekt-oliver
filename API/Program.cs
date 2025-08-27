@@ -14,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Database
 builder.Services.AddDbContext<AppDBContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("DATABASE_URL"));
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking); // default: no tracking, opt-in når vi skal skrive
 });
 
