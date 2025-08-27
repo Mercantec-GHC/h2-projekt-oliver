@@ -18,8 +18,8 @@ public class Program
         string apiEndpoint = !string.IsNullOrEmpty(envApiEndpoint)
      ? envApiEndpoint
      : (builder.HostEnvironment.IsDevelopment()
-         ? "https://localhost:8052/" // backend dev
-         : "https://h2api.mercantec.tech/"); // prod
+         ? "https://localhost:9022/" // backend dev
+         : "https://johotel.mercantec.tech/"); // prod
 
 
         Console.WriteLine($"API Endpoint: {apiEndpoint}");
