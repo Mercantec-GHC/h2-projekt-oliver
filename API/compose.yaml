@@ -1,4 +1,4 @@
-services:
+﻿services:
   # API Service
   api:
     build:
@@ -18,7 +18,6 @@ services:
       - DOTNET_RUNNING_IN_CONTAINER=true
     networks:
       - h2-network
-
   # Blazor WASM App
   blazor:
     build:
@@ -38,7 +37,7 @@ services:
       - api
     networks:
       - h2-network
-
 networks:
   h2-network:
     driver: bridge
+ 
