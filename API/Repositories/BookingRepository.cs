@@ -11,7 +11,7 @@ namespace API.Repositories
         public Task<bool> RoomExistsAsync(int roomId) =>
             _db.Rooms.AsNoTracking().AnyAsync(r => r.Id == roomId);
 
-        public Task<bool> HasOverlapAsync(int roomId, DateTime checkIn, DateTime checkOut) =>
+        public Task<bool> HasOverlapAsync(int roomId, DateTimeOffset checkIn, DateTimeOffset checkOut) =>
             _db.Bookings.AsNoTracking().AnyAsync(b =>
                 b.RoomId == roomId &&
                 ((checkIn >= b.CheckIn && checkIn < b.CheckOut) ||

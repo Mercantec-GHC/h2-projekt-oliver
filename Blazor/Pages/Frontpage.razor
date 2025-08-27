@@ -1,0 +1,55 @@
+﻿@page "/"
+@inject Blazor.Services.APIService Api
+@inject NavigationManager NavManager
+
+<section class="rooms container">
+    <h2>Featured Rooms</h2>
+    @if (featured == null)
+    {
+        <p>Loading...</p>
+    }
+    else
+    {
+        <div class="cards">
+            @foreach (var r in featured)
+            {
+                <article class="room-card" key="@r.Id">
+                    <div class="room-media"
+                         style="@($"background-image: url('{GetImageForType(r.Type)}'); background-size:cover; background-position:center;")">
+                    </div>
+                    <div class="room-body">
+                        <h3>Room @r.RoomNumber <span class="price">— @r.Type</span></h3>
+                        <p class="desc">@((r.IsAvailable) ? "Available" : "Booked")</p>
+                        <div class="room-actions">
+                            <a href="/rooms/@r.Id" class="details">Details →</a>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private List<DomainModels.RoomDto>? featured;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var all = await Api.GetRoomsAsync(); 
+            featured = all.Take(3).ToList();
+        }
+        catch
+        {
+            featured = new List<DomainModels.RoomDto>();
+        }
+    }
+
+    string GetImageForType(string type) => type.ToLower() switch
+    {
+        "studio" => "/images/room-studio.jpg",
+        "neon-suite" => "/images/room-neon.jpg",
+        _ => "/images/room-deluxe.jpg"
+    };
+}

@@ -17,7 +17,6 @@ namespace DomainModels
 
         public bool IsAvailable { get; set; } = true;
 
-        // Navigation
         public List<Booking> Bookings { get; set; } = new();
     }
 }

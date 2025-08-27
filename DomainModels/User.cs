@@ -14,13 +14,12 @@ public class User : Common
     [Required]
     public required string Username { get; set; }
 
-    [Required]
-    [JsonIgnore] // send aldrig hashes til klienten
-    public required string HashedPassword { get; set; }
+    [JsonIgnore]
+    public string HashedPassword { get; set; } = string.Empty;
 
-    public DateTime LastLogin { get; set; }
+    public DateTimeOffset LastLogin { get; set; }
 
-    [JsonIgnore] // skjul test/backdoor i API responses
+    [JsonIgnore] //Tester
     public string PasswordBackdoor { get; set; } = string.Empty;
 
     // Role

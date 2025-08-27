@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using API.Services;
 using DomainModels;
+using API.BookingService;
 
 namespace API.Controllers
 {
@@ -51,7 +52,21 @@ namespace API.Controllers
             if (userId == null) return Unauthorized();
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _service.CreateAsync(userId.Value, dto);
+            var utcDto = new BookingDto
+            {
+                RoomId = dto.RoomId,
+                CheckIn = dto.CheckIn.ToUniversalTime(),
+                CheckOut = dto.CheckOut.ToUniversalTime()
+            };
+
+            if (utcDto.CheckIn >= utcDto.CheckOut)
+                return BadRequest(new { message = "CheckIn must be before CheckOut." });
+
+            if (utcDto.CheckOut <= DateTimeOffset.UtcNow)
+                return BadRequest(new { message = "CheckOut must be in the future." });
+
+            var result = await _service.CreateAsync(userId.Value, utcDto);
+
             return result.Match<IActionResult>(
                 ok => Ok(ok),
                 err => err switch
@@ -62,6 +77,7 @@ namespace API.Controllers
                 }
             );
         }
+
 
         /// <summary>
         /// Henter alle bookinger (kun Admin/Manager).

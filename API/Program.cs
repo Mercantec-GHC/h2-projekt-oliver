@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using API.BookingService;
 using API.Data;
 using API.Repositories;
 using API.Services;
@@ -55,18 +56,15 @@ builder.Services
 // CORS – kun whitelistede domæner må kalde API’et
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowSpecificOrigins", policy =>
-    {
-        policy.WithOrigins(
-                "http://localhost:5085",
-                "http://localhost:8052",
-                "https://h2.mercantec.tech",
-                "https://localhost:53617")
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials();
-    });
+    options.AddPolicy("DevAll", p => p
+        .AllowAnyOrigin()
+        .AllowAnyMethod()
+        .AllowAnyHeader());
 });
+
+
+
+
 
 // Swagger + XML-kommentarer + JWT i UI
 builder.Services.AddEndpointsApiExplorer();
@@ -114,7 +112,7 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
-app.UseCors("AllowSpecificOrigins");
+app.UseCors("DevAll");
 
 app.UseAuthentication();
 app.UseAuthorization();

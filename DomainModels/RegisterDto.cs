@@ -13,6 +13,6 @@ public class RegisterDto
     [Required, MinLength(6)]
     public required string Password { get; set; }
 
-    [Required, Phone]
+    [Required, MinLength(8)]
     public required string PhoneNumber { get; set; }
 }

@@ -16,7 +16,6 @@ namespace API.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Relations
             modelBuilder.Entity<User>()
                 .HasOne(u => u.Role)
                 .WithMany(r => r.Users)
@@ -32,9 +31,11 @@ namespace API.Data
                 .HasOne(b => b.Room)
                 .WithMany(r => r.Bookings)
                 .HasForeignKey(b => b.RoomId);
+            modelBuilder.Entity<Booking>()
+                .HasIndex(b => new { b.RoomId, b.CheckIn, b.CheckOut })
+                .HasDatabaseName("IX_Bookings_RoomId_CheckIn_CheckOut");
 
-            // Seed: roller + værelser (+ valgfri admin-bruger)
-            var staticDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var staticDate = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
             modelBuilder.Entity<Role>().HasData(
                 new Role { Id = 1, Name = "Admin", CreatedAt = staticDate, UpdatedAt = staticDate },
@@ -58,7 +59,6 @@ namespace API.Data
             }
             modelBuilder.Entity<Room>().HasData(rooms);
 
-            // (Valgfri) admin-bruger til test
             var adminId = 1;
             modelBuilder.Entity<User>().HasData(new User
             {
@@ -66,7 +66,7 @@ namespace API.Data
                 Email = "admin@hotel.test",
                 Username = "Admin",
                 PhoneNumber = "00000000",
-                HashedPassword = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
+                HashedPassword = "$2a$11$C2sHsoVgVdP2rzn93K9c2O8u9i4cVtFjYJya0w1PKgJjLgM9bIr96",
                 PasswordBackdoor = "Admin123!",
                 RoleId = 1,
                 CreatedAt = staticDate,

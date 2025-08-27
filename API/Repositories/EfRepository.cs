@@ -16,7 +16,13 @@ namespace API.Repositories
         }
 
         public async Task<T?> GetByIdAsync(int id, bool asNoTracking = true)
-            => asNoTracking ? await _set.AsNoTracking().FindAsync(id) : await _set.FindAsync(id);
+        {
+            if (asNoTracking)
+                return await _set.AsNoTracking().FirstOrDefaultAsync(e => EF.Property<int>(e, "Id") == id);
+
+            return await _set.FindAsync(id);
+        }
+
 
         public async Task<IReadOnlyList<T>> ListAsync(Expression<Func<T, bool>>? predicate = null, bool asNoTracking = true)
         {

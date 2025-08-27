@@ -1,6 +1,6 @@
 ﻿using DomainModels;
-
-namespace API.Services
+using OneOf;
+namespace API.BookingService
 {
     public enum BookingError { NotFound, Overlap, Unknown }
 
@@ -8,6 +8,6 @@ namespace API.Services
     {
         Task<IReadOnlyList<object>> GetBookingsForUserAsync(int userId);
         Task<IReadOnlyList<object>> GetAllAsync();
-        Task<OneOf.Types.OneOf<object, BookingError>> CreateAsync(int userId, BookingDto dto);
+        Task<OneOf.OneOf<object, BookingError>> CreateAsync(int userId, BookingDto dto);
     }
 }

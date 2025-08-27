@@ -1,6 +1,7 @@
 ﻿using API.Repositories;
 using DomainModels;
 using OneOf;
+using API.BookingService;
 
 namespace API.Services
 {
@@ -40,16 +41,19 @@ namespace API.Services
 
         public async Task<OneOf<object, BookingError>> CreateAsync(int userId, BookingDto dto)
         {
-            if (!await _repo.RoomExistsAsync(dto.RoomId)) return BookingError.NotFound;
-            if (await _repo.HasOverlapAsync(dto.RoomId, dto.CheckIn, dto.CheckOut)) return BookingError.Overlap;
+            var utcCheckIn = dto.CheckIn.ToUniversalTime();
+            var utcCheckOut = dto.CheckOut.ToUniversalTime();
 
-            var now = DateTime.UtcNow;
+            if (!await _repo.RoomExistsAsync(dto.RoomId)) return BookingError.NotFound;
+            if (await _repo.HasOverlapAsync(dto.RoomId, utcCheckIn, utcCheckOut)) return BookingError.Overlap;
+
+            var now = DateTimeOffset.UtcNow;
             var booking = new Booking
             {
                 UserId = userId,
                 RoomId = dto.RoomId,
-                CheckIn = dto.CheckIn,
-                CheckOut = dto.CheckOut,
+                CheckIn = utcCheckIn,
+                CheckOut = utcCheckOut,
                 CreatedAt = now,
                 UpdatedAt = now,
                 IsConfirmed = true
@@ -67,5 +71,6 @@ namespace API.Services
                 booking.CheckOut
             };
         }
+
     }
 }

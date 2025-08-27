@@ -1,0 +1,49 @@
+﻿@page "/register"
+@inject Blazor.Services.APIService Api
+@inject NavigationManager NavManager
+
+<h3>Register</h3>
+
+<input @bind="username" placeholder="Username" />
+<input @bind="email" placeholder="Email" />
+<input @bind="phone" placeholder="Phone" />
+<input @bind="password" type="password" placeholder="Password" />
+<button @onclick="HandleRegister">Register</button>
+<p class="muted">@message</p>
+
+@code {
+    private string username = "";
+    private string email = "";
+    private string phone = "";
+    private string password = "";
+    private string message = "";
+
+    async Task HandleRegister()
+    {
+        try
+        {
+            var dto = new DomainModels.RegisterDto
+                {
+                    Email = email,
+                    Username = username,
+                    Password = password,
+                    PhoneNumber = phone
+                };
+
+            var res = await Api.RegisterAsync(dto);
+            if (res.IsSuccessStatusCode)
+            {
+                NavManager.NavigateTo("/login");
+            }
+            else
+            {
+                var txt = await res.Content.ReadAsStringAsync();
+                message = "Register failed: " + txt;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = "Register error: " + ex.Message;
+        }
+    }
+}

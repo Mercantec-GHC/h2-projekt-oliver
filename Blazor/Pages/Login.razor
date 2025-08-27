@@ -1,0 +1,55 @@
+﻿@page "/login"
+@using DomainModels
+@inject Blazor.Services.APIService Api
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager NavManager
+
+<h3>Login</h3>
+
+<div class="auth-card">
+    <input @bind="email" placeholder="Email" />
+    <input @bind="password" type="password" placeholder="Password" />
+    <div style="margin-top:.6rem">
+        <button @onclick="HandleLogin">Login</button>
+    </div>
+    <p class="muted">@message</p>
+</div>
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string message = "";
+
+    async Task HandleLogin()
+    {
+        try
+        {
+            var res = await Api.LoginAsync(new LoginDto { Email = email?.Trim(), Password = password });
+
+            if (!res.IsSuccessStatusCode)
+            {
+                var err = await res.Content.ReadFromJsonAsync<Dictionary<string, string?>>();
+                message = err != null && err.TryGetValue("message", out var m) ? $"Login failed: {m}" : "Login failed: invalid credentials";
+                return;
+            }
+
+            var loginRes = await res.Content.ReadFromJsonAsync<LoginResponseDto>();
+            if (loginRes == null || string.IsNullOrWhiteSpace(loginRes.Token))
+            {
+                var raw = await res.Content.ReadAsStringAsync();
+                message = $"Login failed: no token returned (body: {raw})";
+                return;
+            }
+
+            await LocalStorage.SetItemAsync("authToken", loginRes.Token);
+            Api.SetBearer(loginRes.Token);
+
+            message = "Login successful";
+            NavManager.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            message = "Login error: " + ex.Message;
+        }
+    }
+}

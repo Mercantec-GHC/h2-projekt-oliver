@@ -4,7 +4,7 @@ using DomainModels;
 
 namespace Blazor.Services
 {
-    public partial class APIService
+    public class APIService
     {
         private readonly HttpClient _http;
 
@@ -21,21 +21,24 @@ namespace Blazor.Services
                 _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        // Users
-        public Task<HttpResponseMessage> RegisterAsync(RegisterDto dto) =>
-            _http.PostAsJsonAsync("api/users/register", dto);
+ 
+        public Task<HttpResponseMessage> RegisterAsync(object anonymousDto) =>
+            _http.PostAsJsonAsync("api/auth/register", anonymousDto);
 
-        public Task<HttpResponseMessage> LoginAsync(LoginDto dto) =>
-            _http.PostAsJsonAsync("api/users/login", dto);
+        public Task<HttpResponseMessage> LoginAsync(DomainModels.LoginDto dto) =>
+            _http.PostAsJsonAsync("api/auth/login", dto);
 
-        public Task<HttpResponseMessage> MeAsync() =>
-            _http.GetAsync("api/users/me");
+        public Task<List<DomainModels.RoomDto>> GetRoomsAsync() =>
+    _http.GetFromJsonAsync<List<DomainModels.RoomDto>>("api/rooms")!;
 
-        // Bookings
+        public Task<List<DomainModels.RoomDto>> GetRoomsAsync(DateTimeOffset from, DateTimeOffset to) =>
+            _http.GetFromJsonAsync<List<DomainModels.RoomDto>>(
+                $"api/rooms?from={Uri.EscapeDataString(from.ToString("o"))}&to={Uri.EscapeDataString(to.ToString("o"))}")!;
+
+        public Task<HttpResponseMessage> CreateBookingAsync(DomainModels.BookingDto dto) =>
+            _http.PostAsJsonAsync("api/bookings", dto);
+
         public Task<HttpResponseMessage> GetMyBookingsAsync() =>
             _http.GetAsync("api/bookings/my");
-
-        public Task<HttpResponseMessage> CreateBookingAsync(BookingDto dto) =>
-            _http.PostAsJsonAsync("api/bookings", dto);
     }
 }

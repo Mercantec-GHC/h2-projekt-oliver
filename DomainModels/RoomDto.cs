@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace DomainModels
 {
-    public class Common
+    public class RoomDto
     {
-        [Key]
         public int Id { get; set; }
-        public DateTimeOffset CreatedAt { get; set; }
-        public DateTimeOffset UpdatedAt { get; set; }
+        public int RoomNumber { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public bool IsAvailable { get; set; }
     }
 }

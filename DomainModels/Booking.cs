@@ -13,10 +13,11 @@ public class Booking : Common
     public Room Room { get; set; } = default!;
 
     [Required]
-    public DateTime CheckIn { get; set; }
+    public DateTimeOffset CheckIn { get; set; }
 
     [Required]
-    public DateTime CheckOut { get; set; }
+    public DateTimeOffset CheckOut { get; set; }
 
     public bool IsConfirmed { get; set; } = false;
 }
+
