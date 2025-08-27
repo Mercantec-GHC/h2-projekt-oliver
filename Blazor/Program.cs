@@ -14,20 +14,19 @@ public class Program
         builder.RootComponents.Add<App>("#app");
         builder.RootComponents.Add<HeadOutlet>("head::after");
 
-        var envApiEndpoint = Environment.GetEnvironmentVariable("API_ENDPOINT");
-        string apiEndpoint = !string.IsNullOrEmpty(envApiEndpoint)
-     ? envApiEndpoint
-     : (builder.HostEnvironment.IsDevelopment()
-         ? "https://localhost:9022/" // backend dev
-         : "https://johotel.mercantec.tech/"); // prod
-
+        // Prefer config (wwwroot/appsettings.json) -> fallback to sensible values
+        var apiEndpoint = builder.Configuration["ApiEndpoint"];
+        if (string.IsNullOrWhiteSpace(apiEndpoint))
+        {
+            apiEndpoint = builder.HostEnvironment.IsDevelopment()
+                ? "https://localhost:8052/"     // local dev backend (HTTPS)
+                : builder.HostEnvironment.BaseAddress; // production: assume same origin
+        }
 
         Console.WriteLine($"API Endpoint: {apiEndpoint}");
-        apiEndpoint = "https://localhost:8052/"; // API backend
 
         builder.Services.AddBlazoredLocalStorage();
 
-        // IMPORTANT: register only as a typed HttpClient (do NOT call AddScoped<APIService>())
         builder.Services.AddHttpClient<APIService>(client =>
         {
             client.BaseAddress = new Uri(apiEndpoint);
