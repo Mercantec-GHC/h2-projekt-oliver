@@ -1,55 +1,62 @@
 ﻿@page "/login"
-@using DomainModels
 @inject Blazor.Services.APIService Api
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
-@inject NavigationManager NavManager
+@inject Blazor.Services.TokenStorage Storage
+@inject AuthenticationStateProvider AuthProvider
+@using Microsoft.AspNetCore.Components.Authorization
 
 <h3>Login</h3>
 
-<div class="auth-card">
-    <input @bind="email" placeholder="Email" />
-    <input @bind="password" type="password" placeholder="Password" />
-    <div style="margin-top:.6rem">
-        <button @onclick="HandleLogin">Login</button>
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="alert alert-danger">@Error</div>
+}
+
+<EditForm Model="model" OnValidSubmit="HandleLogin">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <div class="mb-3">
+        <label>Username</label>
+        <InputText class="form-control" @bind-Value="model.Username" />
     </div>
-    <p class="muted">@message</p>
-</div>
+    <div class="mb-3">
+        <label>Password</label>
+        <InputText class="form-control" @bind-Value="model.Password" type="password" />
+    </div>
+    <button class="btn btn-primary" disabled="@loading">Log ind</button>
+</EditForm>
 
 @code {
-    private string email = "";
-    private string password = "";
-    private string message = "";
+    private string? Error;
+    private bool loading;
+    private LoginModel model = new();
 
-    async Task HandleLogin()
+    private class LoginModel
     {
-        try
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    private async Task HandleLogin()
+    {
+        Error = null;
+        loading = true;
+
+        var token = await Api.LoginAsync(model.Username, model.Password);
+        if (string.IsNullOrWhiteSpace(token))
         {
-            var res = await Api.LoginAsync(new LoginDto { Email = email?.Trim(), Password = password });
-
-            if (!res.IsSuccessStatusCode)
-            {
-                var err = await res.Content.ReadFromJsonAsync<Dictionary<string, string?>>();
-                message = err != null && err.TryGetValue("message", out var m) ? $"Login failed: {m}" : "Login failed: invalid credentials";
-                return;
-            }
-
-            var loginRes = await res.Content.ReadFromJsonAsync<LoginResponseDto>();
-            if (loginRes == null || string.IsNullOrWhiteSpace(loginRes.Token))
-            {
-                var raw = await res.Content.ReadAsStringAsync();
-                message = $"Login failed: no token returned (body: {raw})";
-                return;
-            }
-
-            await LocalStorage.SetItemAsync("authToken", loginRes.Token);
-            Api.SetBearer(loginRes.Token);
-
-            message = "Login successful";
-            NavManager.NavigateTo("/");
+            Error = "Forkert brugernavn eller adgangskode.";
+            loading = false;
+            return;
         }
-        catch (Exception ex)
+
+        await Storage.SetTokenAsync(token);
+        if (AuthProvider is Blazor.Services.AuthStateProvider custom)
         {
-            message = "Login error: " + ex.Message;
+            await custom.MarkUserAsAuthenticatedAsync(token);
         }
+
+        loading = false;
+        // TODO: Navigér til en beskyttet side 
+        // NavigationManager.NavigateTo("/");
     }
 }

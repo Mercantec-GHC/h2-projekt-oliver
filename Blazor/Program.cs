@@ -1,38 +1,25 @@
-using System;
+using Blazor;
+using Blazor.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Blazored.LocalStorage;
-using Blazor.Services;
+using System.Net.Http;
 
-namespace Blazor;
+var builder = WebAssemblyHostBuilder.CreateDefault(args);
+builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<HeadOutlet>("head::after");
 
-public class Program
-{
-    public static async Task Main(string[] args)
-    {
-        var builder = WebAssemblyHostBuilder.CreateDefault(args);
-        builder.RootComponents.Add<App>("#app");
-        builder.RootComponents.Add<HeadOutlet>("head::after");
 
-        // Prefer config (wwwroot/appsettings.json) -> fallback to sensible values
-        var apiEndpoint = builder.Configuration["ApiEndpoint"];
-        if (string.IsNullOrWhiteSpace(apiEndpoint))
-        {
-            apiEndpoint = builder.HostEnvironment.IsDevelopment()
-                ? "https://localhost:8052/"     // local dev backend (HTTPS)
-                : builder.HostEnvironment.BaseAddress; // production: assume same origin
-        }
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
-        Console.WriteLine($"API Endpoint: {apiEndpoint}");
+// Auth & State
+builder.Services.AddAuthorizationCore();
+builder.Services.AddScoped<TokenStorage>();
+builder.Services.AddScoped<AuthenticationStateProvider, AuthStateProvider>();
 
-        builder.Services.AddBlazoredLocalStorage();
+// API Service
+builder.Services.AddScoped<APIService>();
 
-        builder.Services.AddHttpClient<APIService>(client =>
-        {
-            client.BaseAddress = new Uri(apiEndpoint);
-            Console.WriteLine($"APIService BaseAddress: {client.BaseAddress}");
-        });
+var host = builder.Build();
 
-        await builder.Build().RunAsync();
-    }
-}
+_ = host.RunAsync();
