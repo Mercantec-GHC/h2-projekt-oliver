@@ -14,9 +14,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Database
 builder.Services.AddDbContext<AppDBContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("DATABASE_URL"));
-    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking); // default: no tracking, opt-in når vi skal skrive
+    var cs = builder.Configuration.GetConnectionString("DefaultConnection")
+             ?? throw new InvalidOperationException("DefaultConnection missing.");
+    options.UseNpgsql(cs);
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
+
 
 // Controllers + ModelState validation responses
 builder.Services.AddControllers();
@@ -102,7 +105,19 @@ builder.Services.AddScoped<JwtService>();
 
 var app = builder.Build();
 
-// Swagger altid slået til (let hosting/debug)
+// Optional: auto-migrate in container
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDBContext>();
+    db.Database.Migrate();
+}
+
+// Only redirect in non-dev (your compose sets Development)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -110,13 +125,8 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = string.Empty;
 });
 
-app.UseHttpsRedirection();
-
 app.UseCors("DevAll");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
