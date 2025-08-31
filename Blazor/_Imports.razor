@@ -15,3 +15,11 @@
 @using Blazor.Components
 @inject Blazor.Services.APIService ApiService
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@using DomainModels
+@inject Blazor.Services.APIService Api
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager NavManager
+@inject Blazor.Services.TokenStorage Storage
+@inject AuthenticationStateProvider AuthProvider
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Authorization

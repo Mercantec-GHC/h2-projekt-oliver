@@ -3,8 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using DomainModels;
 
 namespace Blazor.Services
 {
@@ -12,11 +11,20 @@ namespace Blazor.Services
     {
         private readonly HttpClient _http;
         private readonly TokenStorage _storage;
+        private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
         public APIService(HttpClient http, TokenStorage storage)
         {
             _http = http;
             _storage = storage;
+        }
+
+        public void SetBearer(string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                _http.DefaultRequestHeaders.Authorization = null;
+            else
+                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
         private async Task ApplyAuthAsync()
@@ -27,8 +35,6 @@ namespace Blazor.Services
             else
                 _http.DefaultRequestHeaders.Authorization = null;
         }
-
-        private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
         public async Task<T?> GetAsync<T>(string url)
         {
@@ -53,7 +59,8 @@ namespace Blazor.Services
         public async Task<HttpResponseMessage> PostAsync(string url, object? body = null)
         {
             await ApplyAuthAsync();
-            if (body is null) return await _http.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
+            if (body is null)
+                return await _http.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
             return await _http.PostAsJsonAsync(url, body, _json);
         }
 
@@ -71,7 +78,13 @@ namespace Blazor.Services
             return await _http.DeleteAsync(url);
         }
 
-        // Hjælpere til login/register 
+
+        public Task<HttpResponseMessage> LoginAsync(LoginDto dto) =>
+            _http.PostAsJsonAsync("api/auth/login", dto);
+
+        public Task<HttpResponseMessage> RegisterAsync(object anonymousDto) =>
+            _http.PostAsJsonAsync("api/auth/register", anonymousDto);
+
         public record LoginRequest(string Username, string Password);
         public record RegisterRequest(string Username, string Email, string Password);
 
@@ -87,12 +100,24 @@ namespace Blazor.Services
                 if (doc.RootElement.TryGetProperty("token", out var t))
                     return t.GetString();
             }
-            catch { /* fallback */ }
-
+            catch { }
             return null;
         }
 
-        public Task<HttpResponseMessage> RegisterAsync(string username, string email, string password)
-            => PostAsync("api/auth/register", new RegisterRequest(username, email, password));
+        public Task<HttpResponseMessage> RegisterAsync(string username, string email, string password) =>
+            PostAsync("api/auth/register", new RegisterRequest(username, email, password));
+
+        public Task<List<RoomDto>> GetRoomsAsync() =>
+            _http.GetFromJsonAsync<List<RoomDto>>("api/rooms")!;
+
+        public Task<List<RoomDto>> GetRoomsAsync(DateTimeOffset from, DateTimeOffset to) =>
+            _http.GetFromJsonAsync<List<RoomDto>>(
+                $"api/rooms?from={Uri.EscapeDataString(from.ToString("o"))}&to={Uri.EscapeDataString(to.ToString("o"))}")!;
+
+        public Task<HttpResponseMessage> CreateBookingAsync(BookingDto dto) =>
+            _http.PostAsJsonAsync("api/bookings", dto);
+
+        public Task<HttpResponseMessage> GetMyBookingsAsync() =>
+            _http.GetAsync("api/bookings/my");
     }
 }

@@ -1,62 +1,102 @@
 ﻿@page "/login"
+@using DomainModels
 @inject Blazor.Services.APIService Api
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager NavManager
 @inject Blazor.Services.TokenStorage Storage
 @inject AuthenticationStateProvider AuthProvider
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Authorization
 
 <h3>Login</h3>
 
-@if (!string.IsNullOrWhiteSpace(Error))
-{
-    <div class="alert alert-danger">@Error</div>
-}
-
 <EditForm Model="model" OnValidSubmit="HandleLogin">
     <DataAnnotationsValidator />
     <ValidationSummary />
-    <div class="mb-3">
-        <label>Username</label>
-        <InputText class="form-control" @bind-Value="model.Username" />
+
+    <div class="auth-card">
+        <div class="mb-3">
+            <label>Email</label>
+            <InputText class="form-control" @bind-Value="model.Email" />
+        </div>
+
+        <div class="mb-3">
+            <label>Password</label>
+            <InputText class="form-control" type="password" @bind-Value="model.Password" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="alert alert-danger">@Error</div>
+        }
+
+        <p class="muted">@Message</p>
+
+        <button class="btn btn-primary" disabled="@Loading">Log ind</button>
     </div>
-    <div class="mb-3">
-        <label>Password</label>
-        <InputText class="form-control" @bind-Value="model.Password" type="password" />
-    </div>
-    <button class="btn btn-primary" disabled="@loading">Log ind</button>
 </EditForm>
 
 @code {
+    private LoginForm model = new();
+    private bool Loading;
     private string? Error;
-    private bool loading;
-    private LoginModel model = new();
+    private string Message = "";
 
-    private class LoginModel
+    private sealed class LoginForm
     {
-        public string Username { get; set; } = "";
+        public string Email { get; set; } = "";
         public string Password { get; set; } = "";
     }
 
     private async Task HandleLogin()
     {
         Error = null;
-        loading = true;
+        Message = "";
+        Loading = true;
 
-        var token = await Api.LoginAsync(model.Username, model.Password);
-        if (string.IsNullOrWhiteSpace(token))
+        try
         {
-            Error = "Forkert brugernavn eller adgangskode.";
-            loading = false;
-            return;
-        }
+            var res = await Api.LoginAsync(new LoginDto
+                {
+                    Email = model.Email?.Trim(),
+                    Password = model.Password
+                });
 
-        await Storage.SetTokenAsync(token);
-        if (AuthProvider is Blazor.Services.AuthStateProvider custom)
+            if (!res.IsSuccessStatusCode)
+            {
+                Dictionary<string, string?>? err = null;
+                try { err = await res.Content.ReadFromJsonAsync<Dictionary<string, string?>>(); } catch { }
+                Error = (err != null && err.TryGetValue("message", out var m) && !string.IsNullOrWhiteSpace(m))
+                    ? $"Login failed: {m}"
+                    : "Login failed: forkert kode eller email";
+                return;
+            }
+
+            var loginRes = await res.Content.ReadFromJsonAsync<LoginResponseDto>();
+            if (loginRes is null || string.IsNullOrWhiteSpace(loginRes.Token))
+            {
+                var raw = await res.Content.ReadAsStringAsync();
+                Error = $"Login failed: no token returned (body: {raw})";
+                return;
+            }
+
+            await LocalStorage.SetItemAsync("authToken", loginRes.Token);
+            await Storage.SetTokenAsync(loginRes.Token);
+            Api.SetBearer(loginRes.Token);
+
+            if (AuthProvider is Blazor.Services.AuthStateProvider custom)
+                await custom.MarkUserAsAuthenticatedAsync(loginRes.Token);
+
+            Message = "Login successful";
+            NavManager.NavigateTo("/");
+        }
+        catch (Exception ex)
         {
-            await custom.MarkUserAsAuthenticatedAsync(token);
+            Error = "Login error: " + ex.Message;
         }
-
-        loading = false;
-        // TODO: Navigér til en beskyttet side 
-        // NavigationManager.NavigateTo("/");
+        finally
+        {
+            Loading = false;
+        }
     }
 }
