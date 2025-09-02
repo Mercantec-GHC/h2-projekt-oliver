@@ -14,8 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Database ---
 builder.Services.AddDbContext<AppDBContext>(options =>
 {
-    // Prefer ConnectionStrings:DefaultConnection (overridable via env var ConnectionStrings__DefaultConnection)
-    // Fallback to DATABASE_URL (e.g., from platforms that set it).
+  
     var cs = builder.Configuration.GetConnectionString("DefaultConnection")
              ?? Environment.GetEnvironmentVariable("DATABASE_URL")
              ?? throw new InvalidOperationException("DefaultConnection missing.");

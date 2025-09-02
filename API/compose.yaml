@@ -7,15 +7,14 @@ services:
       dockerfile: API/Dockerfile
     container_name: h2-api-johotel
     ports:
-      - "9022:8080"   # optional: keep for direct Swagger access in dev
+      - "9022:8080"   
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      # .NET config via env var mapping:
-      ConnectionStrings__DefaultConnection: "Host=ep-damp-grass-a2y11rk5-pooler.eu-central-1.aws.neon.tech;Username=neondb_owner;Password=REPLACE_ME;Database=neondb;sslmode=require"
+      DATABASE_URL: "Host=ep-damp-grass-a2y11rk5-pooler.eu-central-1.aws.neon.tech;Username=neondb_owner;Password=npg_idOpHYQ8JD5E;Database=neondb;sslmode=require"
       Jwt__Issuer: "MyHotelApi"
       Jwt__Audience: "MyHotelFrontend"
-      Jwt__SecretKey: "REPLACE_ME_SUPER_SECRET"
+      Jwt__SecretKey: "SuperSecretKey12345678910111213141516asdfghjkl!?JakobJensen"
       # helps when behind a reverse proxy/https:
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
     restart: unless-stopped
