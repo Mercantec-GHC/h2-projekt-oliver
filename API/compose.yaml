@@ -1,39 +1,41 @@
 ﻿version: "3.8"
 
 services:
-  # API Service (ASP.NET Core)
   api:
     build:
       context: .
       dockerfile: API/Dockerfile
-    container_name: h2-api-Johotel
+    container_name: h2-api-johotel
     ports:
-      - "9022:8080"                 # host:container
+      - "9022:8080"   # optional: keep for direct Swagger access in dev
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080
-      # Optional override instead of appsettings.json (fill password if you use this):
-      # - ConnectionStrings__DefaultConnection=Host=ep-damp-grass-a2y11rk5-pooler.eu-central-1.aws.neon.tech;Username=neondb_owner;Password=YOUR_PASSWORD;Database=neondb;Ssl Mode=Require;Trust Server Certificate=true
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      # .NET config via env var mapping:
+      ConnectionStrings__DefaultConnection: "Host=ep-damp-grass-a2y11rk5-pooler.eu-central-1.aws.neon.tech;Username=neondb_owner;Password=REPLACE_ME;Database=neondb;sslmode=require"
+      Jwt__Issuer: "MyHotelApi"
+      Jwt__Audience: "MyHotelFrontend"
+      Jwt__SecretKey: "REPLACE_ME_SUPER_SECRET"
+      # helps when behind a reverse proxy/https:
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    restart: unless-stopped
     networks:
       - h2-network
-    restart: unless-stopped
 
-  # Blazor WASM (served by nginx or ASP.NET static site – whatever your Dockerfile does)
   blazor:
     build:
       context: .
       dockerfile: Blazor/Dockerfile
-    container_name: h2-blazor-Johotel
+    container_name: h2-blazor-johotel
     ports:
-      - "9021:80"                   # host:container
+      - "9021:80"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ApiEndpoint=http://localhost:9022/   # important: browser calls the API via host port
+      ASPNETCORE_ENVIRONMENT: Development
     depends_on:
       - api
+    restart: unless-stopped
     networks:
       - h2-network
-    restart: unless-stopped
 
 networks:
   h2-network:

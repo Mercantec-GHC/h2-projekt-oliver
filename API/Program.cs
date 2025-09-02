@@ -9,30 +9,29 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Database
+// --- Database ---
 builder.Services.AddDbContext<AppDBContext>(options =>
 {
-    var cs = builder.Configuration.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-
+    // Prefer ConnectionStrings:DefaultConnection (overridable via env var ConnectionStrings__DefaultConnection)
+    // Fallback to DATABASE_URL (e.g., from platforms that set it).
+    var cs = builder.Configuration.GetConnectionString("DefaultConnection")
+             ?? Environment.GetEnvironmentVariable("DATABASE_URL")
              ?? throw new InvalidOperationException("DefaultConnection missing.");
-    options.UseNpgsql(cs);
+
+    options.UseNpgsql(cs, npgsql => npgsql.EnableRetryOnFailure());
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
 
-// Controllers + ModelState validation responses
+// Controllers
 builder.Services.AddControllers();
 
-// JWT
+// --- JWT (env-var friendly via __ mapping) ---
 var jwtKey = builder.Configuration["Jwt:SecretKey"]
-    ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-    ?? "DerVarEngangEnHestDerHedDortheOgDenHavdeDiarreOgElskedeAtBliveNusset123123123";
-
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "H2-2025-API";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "H2-2025-Client";
+             ?? throw new InvalidOperationException("Jwt:SecretKey is not configured.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "H2-2025-API";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "H2-2025-Client";
 var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services
@@ -43,7 +42,7 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
-        options.RequireHttpsMetadata = false;
+        options.RequireHttpsMetadata = false; // set true behind TLS/ingress if desired
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -58,7 +57,8 @@ builder.Services
         };
     });
 
-// CORS – kun whitelistede domæner må kalde API’et
+// --- CORS ---
+// For dev it's open; tighten for prod by listing exact origins (e.g., https://johotel.mercantec.tech)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevAll", p => p
@@ -67,7 +67,7 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader());
 });
 
-// Swagger + XML-kommentarer + JWT i UI
+// --- Swagger ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -80,7 +80,8 @@ builder.Services.AddSwaggerGen(c =>
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    if (File.Exists(xmlPath))
+        c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
 
     var securityScheme = new OpenApiSecurityScheme
     {
@@ -96,14 +97,12 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityRequirement(new OpenApiSecurityRequirement { { securityScheme, Array.Empty<string>() } });
 });
 
-// DI – Repositories & Services
+// DI
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<JwtService>();
 
 var app = builder.Build();
-
-// 🚫 removed auto-migrate block
 
 // Only redirect in non-dev
 if (!app.Environment.IsDevelopment())
@@ -123,5 +122,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Optional simple health endpoint
+app.MapGet("/health", () => Results.Ok("OK"));
 
 app.Run();
