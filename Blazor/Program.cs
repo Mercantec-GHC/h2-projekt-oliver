@@ -21,7 +21,7 @@ namespace Blazor
             if (string.IsNullOrWhiteSpace(apiEndpoint))
             {
                 apiEndpoint = builder.HostEnvironment.IsDevelopment()
-                    ? "https://localhost:9022/" 
+                    ? "https://localhost:8052/" 
                     : builder.HostEnvironment.BaseAddress;
             }
 

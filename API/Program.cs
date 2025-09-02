@@ -9,17 +9,19 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Database
 builder.Services.AddDbContext<AppDBContext>(options =>
 {
-    var cs = builder.Configuration.GetConnectionString("DefaultConnection")
+    var cs = builder.Configuration.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+
              ?? throw new InvalidOperationException("DefaultConnection missing.");
     options.UseNpgsql(cs);
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
-
 
 // Controllers + ModelState validation responses
 builder.Services.AddControllers();
@@ -65,10 +67,6 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader());
 });
 
-
-
-
-
 // Swagger + XML-kommentarer + JWT i UI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -105,14 +103,9 @@ builder.Services.AddScoped<JwtService>();
 
 var app = builder.Build();
 
-// Optional: auto-migrate in container
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDBContext>();
-    db.Database.Migrate();
-}
+// 🚫 removed auto-migrate block
 
-// Only redirect in non-dev (your compose sets Development)
+// Only redirect in non-dev
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -128,5 +121,7 @@ app.UseSwaggerUI(c =>
 app.UseCors("DevAll");
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
+
 app.Run();
