@@ -18,15 +18,15 @@ namespace API.Services
         {
             _secretKey = configuration["Jwt:SecretKey"]
                 ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-                ?? "MyVerySecureSecretKeyThatIsAtLeast32CharactersLong123456789";
+                ?? "SuperSecretKey12345678910111213141516asdfghjkl!?JakobJensen";
 
             _issuer = configuration["Jwt:Issuer"]
                 ?? Environment.GetEnvironmentVariable("JWT_ISSUER")
-                ?? "H2-2025-API";
+                ?? "MyHotelApi";
 
             _audience = configuration["Jwt:Audience"]
                 ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE")
-                ?? "H2-2025-Client";
+                ?? "MyHotelFrontend";
 
             _expiryMinutes = int.Parse(configuration["Jwt:ExpiryMinutes"]
                 ?? Environment.GetEnvironmentVariable("JWT_EXPIRY_MINUTES")
