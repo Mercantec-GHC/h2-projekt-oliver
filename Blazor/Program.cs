@@ -17,18 +17,15 @@ namespace Blazor
             builder.RootComponents.Add<App>("#app");
             builder.RootComponents.Add<HeadOutlet>("head::after");
 
-            // Read from wwwroot/appsettings.*.json. If missing:
-            // - Dev fallback: localhost:9022 (API container)
-            // - Prod fallback: same origin under /api/ (behind reverse proxy)
+            
             var apiEndpoint = builder.Configuration["ApiEndpoint"];
             if (string.IsNullOrWhiteSpace(apiEndpoint))
             {
                 apiEndpoint = builder.HostEnvironment.IsDevelopment()
-                    ? "http://localhost:9022/"
+                    ? "http://localhost:9022/"  //MÅSKE DENNE?
                     : new Uri(new Uri(builder.HostEnvironment.BaseAddress), "/api/").ToString();
             }
 
-            // Default client for fetching static assets from the Blazor host
             builder.Services.AddScoped(sp => new HttpClient
             {
                 BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
@@ -36,10 +33,9 @@ namespace Blazor
 
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<TokenStorage>();
-            builder.Services.AddScoped<AuthenticationStateProvider, AuthStateProvider>();
+            builder.Services.AddScoped<AuthenticationStateProvider,AuthStateProvider>();
             builder.Services.AddBlazoredLocalStorage();
 
-            // Typed client for your API calls
             builder.Services.AddHttpClient<APIService>(client =>
             {
                 client.BaseAddress = new Uri(apiEndpoint);

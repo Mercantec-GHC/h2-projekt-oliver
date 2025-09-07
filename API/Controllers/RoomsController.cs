@@ -20,6 +20,7 @@ namespace API.Controllers
             var toUtc = (to ?? nowUtc.AddDays(1)).ToUniversalTime();
 
             var rooms = await _db.Rooms
+                .AsNoTracking()
                 .OrderBy(r => r.RoomNumber)
                 .Select(r => new RoomDto
                 {
@@ -44,6 +45,7 @@ namespace API.Controllers
             var toUtc = (to ?? nowUtc.AddDays(1)).ToUniversalTime();
 
             var room = await _db.Rooms
+                .AsNoTracking()
                 .Where(r => r.Id == id)
                 .Select(r => new RoomDto
                 {
@@ -57,7 +59,7 @@ namespace API.Controllers
                 })
                 .FirstOrDefaultAsync();
 
-            if (room == null) return NotFound();
+            if (room is null) return NotFound();
             return Ok(room);
         }
     }

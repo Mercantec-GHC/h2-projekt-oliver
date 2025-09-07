@@ -95,7 +95,7 @@ public class APIService
             if (doc.RootElement.TryGetProperty("token", out var t))
                 return t.GetString();
         }
-        catch { /* ignore parse issues */ }
+        catch {  }
         return null;
     }
 
@@ -109,6 +109,15 @@ public class APIService
     public Task<List<RoomDto>?> GetRoomsAsync(DateTimeOffset from, DateTimeOffset to) =>
         _http.GetFromJsonAsync<List<RoomDto>>(
             $"rooms?from={Uri.EscapeDataString(from.ToString("o"))}&to={Uri.EscapeDataString(to.ToString("o"))}", _json);
+
+    public async Task<List<RoomDto>> GetRoomsOrEmptyAsync()
+    {
+        await ApplyAuthAsync();
+        var list = await _http.GetFromJsonAsync<List<RoomDto>>("rooms", _json);
+        return list ?? new List<RoomDto>();
+    }
+
+
 
     // --- Bookings ---
     public Task<HttpResponseMessage> CreateBookingAsync(BookingDto dto) =>

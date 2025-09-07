@@ -1,41 +1,60 @@
 ﻿@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager NavManager
 
 <header class="nav">
     <div class="nav-inner container">
-        <a class="brand" href="/">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <a class="brand" href="/" aria-label="JoHotel forside">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#E8E0D5" />
+                        <stop offset="100%" stop-color="#C8A96B" />
+                    </linearGradient>
+                </defs>
                 <rect x="2" y="4" width="20" height="16" rx="3" fill="url(#g)" />
             </svg>
             <span class="brand-text">JoHotel</span>
         </a>
 
-        <nav class="links @(isOpen ? "open" : "")">
-            <NavLink href="/" Match="NavLinkMatch.All">Home</NavLink>
-            <NavLink href="/rooms">Rooms</NavLink>
-            <NavLink href="/offers">Offers</NavLink>
-            <NavLink href="/about">About</NavLink>
+        <nav class="links @(isOpen ? "open" : string.Empty)">
+            <NavLink href="/" Match="NavLinkMatch.All">Hjem</NavLink>
+            <NavLink href="/rooms">Værelser</NavLink>
+            <NavLink href="/offers">Tilbud</NavLink>
+            <NavLink href="/about">Om os</NavLink>
         </nav>
 
         <div class="actions">
-            <button class="btn-outline" @onclick="Booking">Book</button>
+            <AuthorizeView>
+                <NotAuthorized>
+                    <a class="btn-outline" href="/login">Log ind</a>
+                    <a class="btn" href="/register">Opret</a>
+                </NotAuthorized>
 
-            <button class="hamburger" @onclick="ToggleMenu" aria-label="menu">
+                <Authorized Context="auth">
+                    @{
+                        var user = auth.User;
+                        string displayName =
+                        user?.FindFirst("name")?.Value 
+                        ?? user?.FindFirst("unique_name")?.Value
+                        ?? user?.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name")?.Value
+                        ?? user?.Identity?.Name
+                        ?? "Min profil";
+                    }
+                    <a class="btn-outline" href="/booking">Book</a>
+                    <a class="btn" href="/user">@displayName</a>
+                </Authorized>
+            </AuthorizeView>
+
+            <button class="hamburger" @onclick="ToggleMenu" aria-label="Åbn/luk menu">
                 <span></span><span></span><span></span>
             </button>
         </div>
     </div>
 </header>
 
-
-
-@code{
-  private bool isOpen = false;
-  void ToggleMenu() => isOpen = !isOpen;
-
-    void Booking()
-    {
-        NavManager.NavigateTo("/booking");
-    }
+@code {
+    private bool isOpen;
+    void ToggleMenu() => isOpen = !isOpen;
 }

@@ -26,7 +26,7 @@ builder.Services.AddDbContext<AppDBContext>(options =>
 // Controllers
 builder.Services.AddControllers();
 
-// --- JWT (env-var friendly via __ mapping) ---
+// JWT
 var jwtKey = builder.Configuration["Jwt:SecretKey"]
              ?? throw new InvalidOperationException("Jwt:SecretKey is not configured.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "H2-2025-API";
@@ -41,7 +41,7 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
-        options.RequireHttpsMetadata = false; // set true behind TLS/ingress if desired
+        options.RequireHttpsMetadata = false; 
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -57,7 +57,7 @@ builder.Services
     });
 
 // --- CORS ---
-// For dev it's open; tighten for prod by listing exact origins (e.g., https://johotel.mercantec.tech)
+// MÅSKE ÆNDRE TIL DEN SEPCIFIKKE FRONTEND URL I STEDET FOR ÅBEN FOR ALLE ?
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevAll", p => p

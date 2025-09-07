@@ -8,7 +8,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Authorization
 
-<h3>Login</h3>
+<h1>Log ind</h1>
 
 <EditForm Model="model" OnValidSubmit="HandleLogin">
     <DataAnnotationsValidator />
@@ -16,13 +16,13 @@
 
     <div class="auth-card">
         <div class="mb-3">
-            <label>Email</label>
-            <InputText class="form-control" @bind-Value="model.Email" />
+            <label for="email">E-mail</label>
+            <InputText id="email" class="form-control" @bind-Value="model.Email" />
         </div>
 
         <div class="mb-3">
-            <label>Password</label>
-            <InputText class="form-control" type="password" @bind-Value="model.Password" />
+            <label for="pwd">Adgangskode</label>
+            <InputText id="pwd" class="form-control" type="password" @bind-Value="model.Password" />
         </div>
 
         @if (!string.IsNullOrWhiteSpace(Error))
@@ -30,9 +30,12 @@
             <div class="alert alert-danger">@Error</div>
         }
 
-        <p class="muted">@Message</p>
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <p class="muted">@Message</p>
+        }
 
-        <button class="btn btn-primary" disabled="@Loading">Log ind</button>
+        <button class="btn" disabled="@Loading">Log ind</button>
     </div>
 </EditForm>
 
@@ -40,18 +43,18 @@
     private LoginForm model = new();
     private bool Loading;
     private string? Error;
-    private string Message = "";
+    private string Message = string.Empty;
 
     private sealed class LoginForm
     {
-        public string Email { get; set; } = "";
-        public string Password { get; set; } = "";
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 
     private async Task HandleLogin()
     {
         Error = null;
-        Message = "";
+        Message = string.Empty;
         Loading = true;
 
         try
@@ -67,8 +70,8 @@
                 Dictionary<string, string?>? err = null;
                 try { err = await res.Content.ReadFromJsonAsync<Dictionary<string, string?>>(); } catch { }
                 Error = (err != null && err.TryGetValue("message", out var m) && !string.IsNullOrWhiteSpace(m))
-                    ? $"Login failed: {m}"
-                    : "Login failed: forkert kode eller email";
+                    ? $"Login mislykkedes: {m}"
+                    : "Login mislykkedes: forkert e-mail eller adgangskode";
                 return;
             }
 
@@ -76,7 +79,7 @@
             if (loginRes is null || string.IsNullOrWhiteSpace(loginRes.Token))
             {
                 var raw = await res.Content.ReadAsStringAsync();
-                Error = $"Login failed: no token returned (body: {raw})";
+                Error = $"Login mislykkedes: intet token returneret (body: {raw})";
                 return;
             }
 
@@ -87,12 +90,12 @@
             if (AuthProvider is Blazor.Services.AuthStateProvider custom)
                 await custom.MarkUserAsAuthenticatedAsync(loginRes.Token);
 
-            Message = "Login successful";
+            Message = "Login gennemført";
             NavManager.NavigateTo("/");
         }
         catch (Exception ex)
         {
-            Error = "Login error: " + ex.Message;
+            Error = "Login-fejl: " + ex.Message;
         }
         finally
         {

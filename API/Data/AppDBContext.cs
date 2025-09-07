@@ -31,10 +31,20 @@ namespace API.Data
                 .HasOne(b => b.Room)
                 .WithMany(r => r.Bookings)
                 .HasForeignKey(b => b.RoomId);
+
             modelBuilder.Entity<Booking>()
                 .HasIndex(b => new { b.RoomId, b.CheckIn, b.CheckOut })
                 .HasDatabaseName("IX_Bookings_RoomId_CheckIn_CheckOut");
 
+            modelBuilder.Entity<Room>()
+                .HasIndex(r => r.RoomNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<Room>()
+                .Property(r => r.Type)
+                .HasConversion<string>();
+
+            // Seed data
             var staticDate = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
             modelBuilder.Entity<Role>().HasData(
@@ -44,14 +54,20 @@ namespace API.Data
                 new Role { Id = 4, Name = "Cleaner", CreatedAt = staticDate, UpdatedAt = staticDate }
             );
 
+            // Seed 400 rooms: 1–300 Standard, 301–360 Family, 361–400 Suite
             var rooms = new List<Room>();
             for (int i = 1; i <= 400; i++)
             {
+                var type =
+                    i <= 300 ? RoomType.Standard :
+                    i <= 360 ? RoomType.Family :
+                               RoomType.Suite;
+
                 rooms.Add(new Room
                 {
                     Id = i,
                     RoomNumber = i,
-                    Type = "Standard",
+                    Type = type,
                     IsAvailable = true,
                     CreatedAt = staticDate,
                     UpdatedAt = staticDate
@@ -59,10 +75,10 @@ namespace API.Data
             }
             modelBuilder.Entity<Room>().HasData(rooms);
 
-            var adminId = 1;
+            // Seed admin
             modelBuilder.Entity<User>().HasData(new User
             {
-                Id = adminId,
+                Id = 1,
                 Email = "admin@hotel.test",
                 Username = "Admin",
                 PhoneNumber = "00000000",

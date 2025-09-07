@@ -1,27 +1,67 @@
 ﻿@page "/"
+@using DomainModels
 @inject Blazor.Services.APIService Api
-@inject NavigationManager NavManager
+@inject NavigationManager Nav
 
-<section class="rooms container">
-    <h2>Featured Rooms</h2>
-    @if (featured == null)
+<section class="hero" style="@($"background-image:url('{ImgUrl("pic1.png")}');")">
+    <div class="hero-inner">
+        <h1>Velkommen til JoHotel</h1>
+        <p>Find det perfekte ophold – elegant komfort i hjertet af byen.</p>
+    </div>
+</section>
+
+<section class="section-pad container">
+    <h2>Udvalgte værelser</h2>
+
+    @if (featured is null)
     {
-        <p>Loading...</p>
+        <p class="muted">Henter værelser…</p>
+    }
+    else if (featured.Count == 0)
+    {
+        <p class="muted">Ingen værelser at vise.</p>
     }
     else
     {
         <div class="cards">
             @foreach (var r in featured)
             {
-                <article class="room-card" key="@r.Id">
-                    <div class="room-media"
-                         style="@($"background-image: url('{GetImageForType(r.Type)}'); background-size:cover; background-position:center;")">
+                var price = RoomHelpers.BasePrice(r.Type);
+                var img = RoomHelpers.ImageFor(r.Type);
+                var label = r.Type.DisplayName();
+
+                <article class="room-card" key="@r.Id" style="position:relative;">
+                    <div style="
+                        position:absolute; left:12px; top:12px; z-index:2;
+                        background:#F1E8DA; color:#3F2F22; border:1px solid #E4D8C7;
+                        font-weight:700; font-size:.82rem; padding:.25rem .5rem; border-radius:8px;">
+                        Fra @price.AsCurrency() / nat
                     </div>
+
+                    <div class="room-media" style="@($"background-image:url('{ImgUrl(img)}');")"></div>
                     <div class="room-body">
-                        <h3>Room @r.RoomNumber <span class="price">— @r.Type</span></h3>
-                        <p class="desc">@((r.IsAvailable) ? "Available" : "Booked")</p>
-                        <div class="room-actions">
-                            <a href="/rooms/@r.Id" class="details">Details →</a>
+                        <h3>
+                            Værelse @r.RoomNumber
+                            <span class="price">— @label</span>
+                        </h3>
+
+                        <p class="desc">
+                            @if (r.IsAvailable)
+                            {
+                                <span class="badge badge-ok" title="Værelset kan bookes">Ledigt</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-no" title="Værelset er optaget">Optaget</span>
+                            }
+                        </p>
+
+                        <div class="room-actions" style="display:flex; gap:.6rem; justify-content:flex-end;">
+                            <a href="/rooms/@r.Id" class="details">Detaljer →</a>
+                            @if (r.IsAvailable)
+                            {
+                                <a href="/booking?roomId=@r.Id" class="btn btn-small">Book nu</a>
+                            }
                         </div>
                     </div>
                 </article>
@@ -31,25 +71,20 @@
 </section>
 
 @code {
-    private List<DomainModels.RoomDto>? featured;
+    private List<RoomDto>? featured;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var all = await Api.GetRoomsAsync(); 
+            var all = await Api.GetRoomsOrEmptyAsync();
             featured = all.Take(3).ToList();
         }
         catch
         {
-            featured = new List<DomainModels.RoomDto>();
+            featured = new List<RoomDto>();
         }
     }
 
-    string GetImageForType(string type) => type.ToLower() switch
-    {
-        "studio" => "/images/room-studio.jpg",
-        "neon-suite" => "/images/room-neon.jpg",
-        _ => "/images/room-deluxe.jpg"
-    };
+    string ImgUrl(string file) => $"{Nav.BaseUri}{file}";
 }

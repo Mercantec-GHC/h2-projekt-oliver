@@ -1,19 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace DomainModels
 {
     public class Room : Common
     {
         [Required]
-        public int RoomNumber { get; set; } // 1–400
+        public int RoomNumber { get; set; }
 
         [Required]
-        public string Type { get; set; } = "Standard"; // Standard, Deluxe, Suite
+        public RoomType Type { get; set; } = RoomType.Standard;
 
         public bool IsAvailable { get; set; } = true;
 
