@@ -1,0 +1,47 @@
+﻿@using System.Net.Http.Json
+@using Blazor.Services
+@inject APIService Api
+
+<div class="calendar" role="grid" aria-label="Tilgængelighedskalender">
+    <div class="calendar-row head">
+        @foreach (var d in Enumerable.Range(0, 14).Select(i => Start.Date.AddDays(i)))
+        {
+            <div class="cell head">@d.ToString("dd/MM")</div>
+        }
+    </div>
+    <div class="calendar-row">
+        @foreach (var d in Enumerable.Range(0, 14).Select(i => Start.Date.AddDays(i)))
+        {
+            var isBooked = Booked.Any(b => b.Start < d.AddDays(1) && b.End > d);
+            <div class="cell @(isBooked ? "busy" : "free")" title="@(isBooked ? "Optaget" : "Ledig")"></div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int RoomId { get; set; }
+    [Parameter] public DateTimeOffset From { get; set; }
+    [Parameter] public DateTimeOffset To { get; set; }
+    [Parameter] public bool UseApiService { get; set; } = true;
+
+    private DateTime Start => DateTime.UtcNow.Date;
+    private List<(DateTime Start, DateTime End)> Booked = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (RoomId <= 0) { Booked.Clear(); return; }
+
+        try
+        {
+            var from = new DateTimeOffset(Start, TimeSpan.Zero);
+            var to = new DateTimeOffset(Start.AddDays(14), TimeSpan.Zero);
+
+            var spans = await Api.GetRoomBookedSpansAsync(RoomId, from, to) ?? new();
+            Booked = spans.Select(s => (s.CheckIn.UtcDateTime, s.CheckOut.UtcDateTime)).ToList();
+        }
+        catch
+        {
+            Booked.Clear(); 
+        }
+    }
+}

@@ -62,5 +62,26 @@ namespace API.Controllers
             if (room is null) return NotFound();
             return Ok(room);
         }
+
+        /// <summary>
+        /// Returns confirmed bookings for a room within a date range (for calendar shading).
+        /// </summary>
+        [HttpGet("{id:int}/booked")]
+        public async Task<IActionResult> GetBookedSpans(
+            int id,
+            [FromQuery] DateTimeOffset? from,
+            [FromQuery] DateTimeOffset? to)
+        {
+            var start = (from ?? DateTimeOffset.UtcNow.AddDays(-30)).ToUniversalTime();
+            var end = (to ?? DateTimeOffset.UtcNow.AddDays(120)).ToUniversalTime();
+
+            var data = await _db.Bookings.AsNoTracking()
+                .Where(b => b.RoomId == id && b.IsConfirmed && b.CheckIn < end && b.CheckOut > start)
+                .Select(b => new { b.CheckIn, b.CheckOut })
+                .OrderBy(b => b.CheckIn)
+                .ToListAsync();
+
+            return Ok(data);
+        }
     }
 }

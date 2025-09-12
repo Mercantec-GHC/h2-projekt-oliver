@@ -116,6 +116,16 @@ public class APIService
         var list = await _http.GetFromJsonAsync<List<RoomDto>>("rooms", _json);
         return list ?? new List<RoomDto>();
     }
+    // --- Rooms (extra helpers — optional but useful) ---
+    public Task<RoomDto?> GetRoomAsync(int id) =>
+        _http.GetFromJsonAsync<RoomDto>($"rooms/{id}", _json);
+
+    // Used by calendars or details pages to shade booked dates (optional)
+    public class SpanVm { public DateTimeOffset CheckIn { get; set; } public DateTimeOffset CheckOut { get; set; } }
+    public Task<List<SpanVm>?> GetRoomBookedSpansAsync(int id, DateTimeOffset from, DateTimeOffset to) =>
+        _http.GetFromJsonAsync<List<SpanVm>>(
+            $"rooms/{id}/booked?from={Uri.EscapeDataString(from.ToString("o"))}&to={Uri.EscapeDataString(to.ToString("o"))}",
+            _json);
 
 
 

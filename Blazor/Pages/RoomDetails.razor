@@ -1,0 +1,49 @@
+﻿@page "/rooms/{id:int}"
+@using DomainModels
+@inject Blazor.Services.APIService Api
+@inject NavigationManager Nav
+
+@if (room is null)
+{
+    <section class="container"><p class="muted">Henter værelse…</p></section>
+}
+else
+{
+    <section class="hero" style="@($"background-image:url('{ImgUrl(RoomHelpers.ImageFor(room.Type))}');")">
+        <div class="hero-inner">
+            <h1>Værelse @room.RoomNumber</h1>
+            <p>@room.Type.DisplayName() — Fra @RoomHelpers.BasePrice(room.Type).AsCurrency() / nat</p>
+        </div>
+    </section>
+
+    <section class="container card">
+        <div class="room-detail">
+            <div class="gallery" style="@($"background-image:url('{ImgUrl(RoomHelpers.ImageFor(room.Type))}');")"></div>
+            <div class="info">
+                <h2>Elegant komfort</h2>
+                <p class="muted">Nyd lune tekstiler, dæmpet belysning og stille luksus.</p>
+                <div class="badges">
+                    <span class="badge">King-size seng</span>
+                    <span class="badge">Regnbruser</span>
+                    <span class="badge">Espressomaskine</span>
+                </div>
+                <div class="actions">
+                    <a class="btn" href="/">← Til forsiden</a>
+                    <a class="btn primary" href="/booking?roomId=@room.Id">Book dette værelse</a>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+    private RoomDto? room;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        room = await Api.GetRoomAsync(id);
+    }
+
+    private string ImgUrl(string file) => $"{Nav.BaseUri}{file}";
+}

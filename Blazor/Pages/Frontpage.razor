@@ -3,71 +3,100 @@
 @inject Blazor.Services.APIService Api
 @inject NavigationManager Nav
 
-<section class="hero" style="@($"background-image:url('{ImgUrl("pic1.png")}');")">
-    <div class="hero-inner">
-        <h1>Velkommen til JoHotel</h1>
-        <p>Find det perfekte ophold – elegant komfort i hjertet af byen.</p>
+<section class="hero-fit">
+    <img class="hero-fit__img" src="@ImgUrl("pic1.png")" alt="JoHotel – stemningsfuld lobby" />
+
+    <div class="hero-fit__overlay" aria-hidden="true"></div>
+
+    <div class="container hero-fit__inner">
+        <div class="lux-eyebrow" aria-hidden="true">
+            <span aria-hidden="true">❦</span>
+            Diskret luksus siden 1998
+            <span aria-hidden="true">❦</span>
+        </div>
+
+        <h1 class="lux-h1">
+            <span class="lux-pre">Velkommen til</span>
+            <span class="lux-brand">JoHotel</span>
+        </h1>
     </div>
 </section>
 
-<section class="section-pad container">
-    <h2>Udvalgte værelser</h2>
+<section id="featured" class="section-pad">
+    <div class="container">
+        <header class="section-head">
+            <h2 class="lux-h2">Udvalgte værelser</h2>
+            <p class="section-sub">Kurateret komfort med sans for detaljer.</p>
+        </header>
 
-    @if (featured is null)
-    {
-        <p class="muted">Henter værelser…</p>
-    }
-    else if (featured.Count == 0)
-    {
-        <p class="muted">Ingen værelser at vise.</p>
-    }
-    else
-    {
-        <div class="cards">
-            @foreach (var r in featured)
-            {
-                var price = RoomHelpers.BasePrice(r.Type);
-                var img = RoomHelpers.ImageFor(r.Type);
-                var label = r.Type.DisplayName();
+        @if (featured is null)
+        {
+            <p class="muted">Henter værelser…</p>
+        }
+        else if (featured.Count == 0)
+        {
+            <p class="muted">Ingen værelser at vise.</p>
+        }
+        else
+        {
+            <div class="cards">
+                @foreach (var r in featured)
+                {
+                    var price = RoomHelpers.BasePrice(r.Type);
+                    var img = RoomHelpers.ImageFor(r.Type);
+                    var label = r.Type.DisplayName();
 
-                <article class="room-card" key="@r.Id" style="position:relative;">
-                    <div style="
-                        position:absolute; left:12px; top:12px; z-index:2;
-                        background:#F1E8DA; color:#3F2F22; border:1px solid #E4D8C7;
-                        font-weight:700; font-size:.82rem; padding:.25rem .5rem; border-radius:8px;">
-                        Fra @price.AsCurrency() / nat
-                    </div>
+                    <article class="room-card" key="@r.Id">
+                        <div class="room-media" style="@($"background-image:url('{ImgUrl(img)}')")">
+                            <div class="room-chip">Fra @price.AsCurrency() / nat</div>
+                        </div>
+                        <div class="room-body">
+                            <h3 class="room-title">
+                                Værelse @r.RoomNumber <span class="room-type">— @label</span>
+                            </h3>
 
-                    <div class="room-media" style="@($"background-image:url('{ImgUrl(img)}');")"></div>
-                    <div class="room-body">
-                        <h3>
-                            Værelse @r.RoomNumber
-                            <span class="price">— @label</span>
-                        </h3>
-
-                        <p class="desc">
                             @if (r.IsAvailable)
                             {
-                                <span class="badge badge-ok" title="Værelset kan bookes">Ledigt</span>
+                                <span class="badge ok" title="Værelset kan bookes">Ledigt</span>
                             }
                             else
                             {
-                                <span class="badge badge-no" title="Værelset er optaget">Optaget</span>
+                                <span class="badge no" title="Værelset er optaget">Optaget</span>
                             }
-                        </p>
 
-                        <div class="room-actions" style="display:flex; gap:.6rem; justify-content:flex-end;">
-                            <a href="/rooms/@r.Id" class="details">Detaljer →</a>
-                            @if (r.IsAvailable)
-                            {
-                                <a href="/booking?roomId=@r.Id" class="btn btn-small">Book nu</a>
-                            }
+                            <div class="room-actions">
+                                <a href="/rooms/@r.Id" class="btn btn-outline">Detaljer</a>
+                                @if (r.IsAvailable)
+                                {
+                                    <a href="/booking?roomId=@r.Id" class="btn btn-gold">Book nu</a>
+                                }
+                            </div>
                         </div>
-                    </div>
-                </article>
-            }
-        </div>
-    }
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+<section class="section-pad">
+    <div class="container highlights">
+        <article class="hi-card">
+            <h3>Signatur Spa</h3>
+            <p>Afstress i vores prisvindende spa med private suiter og aromatiske behandlinger.</p>
+            <a class="text-link" href="/spa">Udforsk spaen →</a>
+        </article>
+        <article class="hi-card">
+            <h3>Gastronomi</h3>
+            <p>Fra morgenbord til natmad — sæsonens råvarer og håndplukkede vine.</p>
+            <a class="text-link" href="/dining">Se dining →</a>
+        </article>
+        <article class="hi-card">
+            <h3>Særlige tilbud</h3>
+            <p>Weekend-retreats, romantiske pakker og længere ophold til fordele.</p>
+            <a class="text-link" href="/offers">Find et tilbud →</a>
+        </article>
+    </div>
 </section>
 
 @code {

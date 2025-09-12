@@ -1,112 +1,60 @@
 ﻿@page "/rooms"
+@using DomainModels
 @inject Blazor.Services.APIService Api
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
-@inject NavigationManager NavManager
+@inject NavigationManager Nav
 
-<h1>Her kan du se vores forskellige værelser</h1>
-
-@if (loading)
-{
-    <p>Loading rooms…</p>
-}
-else if (!string.IsNullOrEmpty(error))
-{
-    <p class="error">@error</p>
-}
-else
-{
-    <div class="rooms-grid">
-        @foreach (var room in rooms!)
-        {
-            <div class="room-card @(room.IsAvailable ? "" : "unavailable")">
-                <h3>Room @room.RoomNumber (@room.Type)</h3>
-                <p>@(room.IsAvailable ? "Available" : "Booked")</p>
-
-                @if (room.IsAvailable)
-                {
-                    <button @onclick="() => TryBook(room.Id)">Book</button>
-                }
-                else
-                {
-                    <button disabled>Unavailable</button>
-                }
-            </div>
-        }
-    </div>
-}
+<section class="container">
+    <h1>Værelser</h1>
+    @if (loading)
+    {
+        <p class="muted">Henter værelser…</p>
+    }
+    else if (!rooms.Any())
+    {
+        <p class="muted">Ingen værelser.</p>
+    }
+    else
+    {
+        <div class="cards">
+            @foreach (var r in rooms)
+            {
+                var img = RoomHelpers.ImageFor(r.Type);
+                <article class="room-card">
+                    <div class="room-media" style="@($"background-image:url('{ImgUrl(img)}');")"></div>
+                    <div class="room-body">
+                        <h3>Værelse @r.RoomNumber <span class="price">— @r.Type.DisplayName()</span></h3>
+                        <p class="desc">
+                            @if (r.IsAvailable)
+                            {
+                                <span class="badge badge-ok">Ledigt</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-no">Optaget</span>
+                            }
+                        </p>
+                        <div class="room-actions">
+                            <a href="/rooms/@r.Id" class="details">Detaljer →</a>
+                            @if (r.IsAvailable)
+                            {
+                                <a href="/booking?roomId=@r.Id" class="btn btn-small">Book nu</a>
+                            }
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
 
 @code {
-    private List<DomainModels.RoomDto>? rooms;
+    private List<RoomDto> rooms = new();
     private bool loading = true;
-    private string? error;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadRoomsAsync();
+        try { rooms = await Api.GetRoomsAsync() ?? new(); }
+        finally { loading = false; }
     }
-
-    private async Task LoadRoomsAsync()
-    {
-        loading = true;
-        error = null;
-        try
-        {
-            var token = await LocalStorage.GetItemAsync<string>("authToken");
-            if (!string.IsNullOrWhiteSpace(token)) Api.SetBearer(token);
-
-            rooms = await Api.GetRoomsAsync();
-        }
-        catch (Exception ex)
-        {
-            error = "Could not load rooms: " + ex.Message;
-            rooms = new List<DomainModels.RoomDto>();
-        }
-        finally
-        {
-            loading = false;
-            StateHasChanged();
-        }
-    }
-
-    async Task TryBook(int roomId)
-    {
-        try
-        {
-            var token = await LocalStorage.GetItemAsync<string>("authToken");
-            if (string.IsNullOrEmpty(token))
-            {
-                NavManager.NavigateTo("/login");
-                return;
-            }
-
-            Api.SetBearer(token);
-
-
-            var localNow = DateTimeOffset.Now;
-            var checkIn = new DateTimeOffset(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, localNow.Offset);
-            var checkOut = checkIn.AddDays(1);
-
-            var dto = new DomainModels.BookingDto
-                {
-                    RoomId = roomId,
-                    CheckIn = checkIn,
-                    CheckOut = checkOut
-                };
-
-            var res = await Api.CreateBookingAsync(dto);
-            if (res.IsSuccessStatusCode)
-            {
-                rooms = await Api.GetRoomsAsync(checkIn.ToUniversalTime(), checkOut.ToUniversalTime());
-            }
-            else
-            {
-                var txt = await res.Content.ReadAsStringAsync();
-                error = "Booking failed: " + txt;
-            }
-        }
-        catch (Exception ex)
-        {
-            error = "Booking error: " + ex.Message;
-        }
-    }
+    private string ImgUrl(string file) => $"{Nav.BaseUri}{file}";
 }
