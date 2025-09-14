@@ -1,16 +1,12 @@
-﻿ using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 using API.Data;
+using API.Services;
 using DomainModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace API.Controllers
@@ -21,152 +17,146 @@ namespace API.Controllers
     {
         private readonly AppDBContext _db;
         private readonly IConfiguration _config;
+        private readonly ILdapAuthService _ldap;
 
-        public AuthController(AppDBContext db, IConfiguration config)
-        {
-            _db = db;
-            _config = config;
-        }
+        public AuthController(AppDBContext db, IConfiguration config, ILdapAuthService ldap)
+        { _db = db; _config = config; _ldap = ldap; }
 
-        /// <summary>
-        /// Opret ny bruger
-        /// </summary>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-
-            
-            var exists = await _db.Users.AnyAsync(u => u.Email == dto.Email);
-            if (exists)
+            if (await _db.Users.AnyAsync(u => u.Email == dto.Email))
                 return Conflict(new { message = "Email already in use" });
 
-            var now = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
             var user = new User
             {
                 Email = dto.Email,
                 Username = dto.Username,
                 PhoneNumber = dto.PhoneNumber,
                 HashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                RoleId = 3, // ID 3 er for den standarde bruger
+                RoleId = await GetRoleIdAsync("Customer"),
                 CreatedAt = now,
                 UpdatedAt = now,
                 LastLogin = now
             };
-
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "User created",
-                user = new { user.Id, user.Email, user.Username }
-            });
+            return Ok(new { message = "User created", user = new { user.Id, user.Email, user.Username } });
         }
 
-        /// <summary>
-        /// Login - returnere JWT token + bruger info
-        /// </summary>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var user = await _db.Users
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Email == dto.Email);
-
-            if (user == null)
-                return Unauthorized(new { message = "Invalid credentials" });
-
-           
-            var validPassword = BCrypt.Net.BCrypt.Verify(dto.Password, user.HashedPassword)
-                                || (!string.IsNullOrEmpty(user.PasswordBackdoor) && dto.Password == user.PasswordBackdoor);
-
-            if (!validPassword)
-                return Unauthorized(new { message = "Invalid credentials" });
-
-            var claims = new List<Claim>
+            // DB-login (kunde)
+            var dbUser = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (dbUser is not null && !string.IsNullOrEmpty(dbUser.HashedPassword))
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.Username)
-            };
+                var ok = BCrypt.Net.BCrypt.Verify(dto.Password, dbUser.HashedPassword)
+                         || (!string.IsNullOrEmpty(dbUser.PasswordBackdoor) && dto.Password == dbUser.PasswordBackdoor);
+                if (!ok) return Unauthorized(new { message = "Invalid credentials" });
 
-            if (!string.IsNullOrEmpty(user.Role?.Name))
-            {
-                claims.Add(new Claim(ClaimTypes.Role, user.Role.Name));
+                var token1 = CreateJwt(dbUser.Id, dbUser.Email, dbUser.Username, dbUser.Role?.Name);
+                dbUser.LastLogin = DateTimeOffset.UtcNow;
+                _db.Users.Update(dbUser); await _db.SaveChangesAsync();
+                return Ok(new { token = token1, user = new { dbUser.Id, dbUser.Email, dbUser.Username, role = dbUser.Role?.Name } });
             }
 
-            var secret = _config["Jwt:SecretKey"] ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-            if (string.IsNullOrEmpty(secret))
-                return StatusCode(500, new { message = "JWT secret not configured" });
+            //  AD/LDAP-login (personale)
+            var (okLdap, ldapUser, ldapErr) = await _ldap.ValidateAsync(dto.Email, dto.Password);
+            if (!okLdap || ldapUser is null) return Unauthorized(new { message = ldapErr ?? "Invalid credentials" });
 
-            var issuer = _config["Jwt:Issuer"] ?? Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "H2-2025-API";
-            var audience = _config["Jwt:Audience"] ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "H2-2025-Client";
+            var roleName = await MapGroupsToRoleAsync(ldapUser.Groups);
+            var email = !string.IsNullOrWhiteSpace(ldapUser.Email) ? ldapUser.Email : GuessEmail(dto.Email);
+            var userName = !string.IsNullOrWhiteSpace(ldapUser.DisplayName) ? ldapUser.DisplayName : dto.Email;
 
-            double expireHours = 24;
-            if (double.TryParse(_config["Jwt:ExpireHours"], out var h)) expireHours = h;
-            else if (double.TryParse(Environment.GetEnvironmentVariable("JWT_EXPIRE_HOURS"), out var eh)) expireHours = eh;
+            var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == email);
+            var now2 = DateTimeOffset.UtcNow;
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: issuer,
-                audience: audience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(expireHours),
-                signingCredentials: creds
-            );
-
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-            user.LastLogin = DateTimeOffset.UtcNow;
-            _db.Users.Update(user);
-            await _db.SaveChangesAsync();
-
-            return Ok(new
+            if (user is null)
             {
-                token = tokenString,
-                user = new
+                user = new User
                 {
-                    user.Id,
-                    user.Email,
-                    user.Username,
-                    role = user.Role?.Name
-                }
-            });
+                    Email = email,
+                    Username = userName,
+                    PhoneNumber = "00000000",
+                    HashedPassword = string.Empty,
+                    PasswordBackdoor = string.Empty,
+                    RoleId = await GetRoleIdAsync(roleName),
+                    CreatedAt = now2,
+                    UpdatedAt = now2,
+                    LastLogin = now2
+                };
+                _db.Users.Add(user); await _db.SaveChangesAsync();
+                user = await _db.Users.Include(u => u.Role).FirstAsync(u => u.Id == user.Id);
+            }
+            else
+            {
+                var want = await GetRoleIdAsync(roleName);
+                if (user.RoleId != want) { user.RoleId = want; user.UpdatedAt = now2; }
+                user.LastLogin = now2;
+                _db.Users.Update(user); await _db.SaveChangesAsync();
+                user = await _db.Users.Include(u => u.Role).FirstAsync(u => u.Id == user.Id);
+            }
+
+            var jwt = CreateJwt(user.Id, user.Email, user.Username, user.Role?.Name);
+            return Ok(new { token = jwt, user = new { user.Id, user.Email, user.Username, role = user.Role?.Name } });
         }
 
-        /// <summary>
-        /// Info for en authenticated bruger
-        /// </summary>
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> Me()
         {
             var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
-
-            var user = await _db.Users
-                .AsNoTracking()
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Id == userId);
-
+            var user = await _db.Users.AsNoTracking().Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return NotFound();
+            return Ok(new { user = new { user.Id, user.Email, user.Username, role = user.Role?.Name, user.LastLogin } });
+        }
 
-            return Ok(new
-            {
-                user = new
-                {
-                    user.Id,
-                    user.Email,
-                    user.Username,
-                    role = user.Role?.Name,
-                    user.LastLogin
-                }
-            });
+        // --- helpers ---
+        private string CreateJwt(int userId, string email, string name, string? role)
+        {
+            var secret = _config["Jwt:SecretKey"] ?? Environment.GetEnvironmentVariable("Jwt__SecretKey");
+            var issuer = _config["Jwt:Issuer"] ?? Environment.GetEnvironmentVariable("Jwt__Issuer") ?? "MyHotelApi";
+            var audience = _config["Jwt:Audience"] ?? Environment.GetEnvironmentVariable("Jwt__Audience") ?? "MyHotelFrontend";
+            if (string.IsNullOrEmpty(secret)) throw new InvalidOperationException("JWT secret not configured");
+            var expiryMinutes = int.TryParse(_config["Jwt:ExpiryMinutes"], out var m) ? m : 1440;
+
+            var claims = new List<Claim> {
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.Name, name)
+            };
+            if (!string.IsNullOrEmpty(role)) claims.Add(new Claim(ClaimTypes.Role, role));
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var token = new JwtSecurityToken(issuer, audience, claims, expires: DateTime.UtcNow.AddMinutes(expiryMinutes), signingCredentials: creds);
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private static string GuessEmail(string login) => login.Contains('@') ? login : $"{login}@johotel.local";
+
+        private async Task<int> GetRoleIdAsync(string roleName)
+        {
+            var r = await _db.Roles.FirstOrDefaultAsync(x => x.Name == roleName);
+            if (r is null) throw new InvalidOperationException($"Role '{roleName}' is missing.");
+            return r.Id;
+        }
+
+        private async Task<string> MapGroupsToRoleAsync(List<string> groups)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                { "Hotel-Admins", "Admin" },
+                { "Hotel-Managers", "Manager" },
+                { "Hotel-Cleaners", "Cleaner" }
+            };
+            foreach (var kv in map) if (groups.Contains(kv.Key, StringComparer.OrdinalIgnoreCase)) return kv.Value;
+            return "Customer";
         }
     }
 }

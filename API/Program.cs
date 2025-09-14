@@ -4,6 +4,7 @@ using API.BookingService;
 using API.Data;
 using API.Repositories;
 using API.Services;
+using DomainModels;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,39 +12,37 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Database ---
+// DB
 builder.Services.AddDbContext<AppDBContext>(options =>
 {
-  
     var cs = builder.Configuration.GetConnectionString("DefaultConnection")
              ?? Environment.GetEnvironmentVariable("DATABASE_URL")
              ?? throw new InvalidOperationException("DefaultConnection missing.");
-
     options.UseNpgsql(cs, npgsql => npgsql.EnableRetryOnFailure());
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
 
-// Controllers
 builder.Services.AddControllers();
 
 // JWT
 var jwtKey = builder.Configuration["Jwt:SecretKey"]
-             ?? throw new InvalidOperationException("Jwt:SecretKey is not configured.");
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "H2-2025-API";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "H2-2025-Client";
+            ?? Environment.GetEnvironmentVariable("Jwt__SecretKey")
+            ?? throw new InvalidOperationException("Jwt:SecretKey is not configured.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? Environment.GetEnvironmentVariable("Jwt__Issuer") ?? "MyHotelApi";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? Environment.GetEnvironmentVariable("Jwt__Audience") ?? "MyHotelFrontend";
 var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services
-    .AddAuthentication(options =>
+    .AddAuthentication(o =>
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
-    .AddJwtBearer(options =>
+    .AddJwtBearer(o =>
     {
-        options.RequireHttpsMetadata = false; 
-        options.SaveToken = true;
-        options.TokenValidationParameters = new TokenValidationParameters
+        o.RequireHttpsMetadata = false;
+        o.SaveToken = true;
+        o.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
@@ -56,33 +55,18 @@ builder.Services
         };
     });
 
-// --- CORS ---
-// MÅSKE ÆNDRE TIL DEN SEPCIFIKKE FRONTEND URL I STEDET FOR ÅBEN FOR ALLE ?
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("DevAll", p => p
-        .AllowAnyOrigin()
-        .AllowAnyMethod()
-        .AllowAnyHeader());
-});
+// CORS
+builder.Services.AddCors(o => o.AddPolicy("DevAll", p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
-// --- Swagger ---
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Hotel API",
-        Version = "v1",
-        Description = "API til hotel booking system (JWT, EF Core, CORS)."
-    });
-
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath))
-        c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
-
-    var securityScheme = new OpenApiSecurityScheme
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Hotel API", Version = "v1" });
+    var xml = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xml);
+    if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath, true);
+    var sec = new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Description = "Skriv 'Bearer {token}'",
@@ -92,8 +76,8 @@ builder.Services.AddSwaggerGen(c =>
         BearerFormat = "JWT",
         Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
     };
-    c.AddSecurityDefinition("Bearer", securityScheme);
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement { { securityScheme, Array.Empty<string>() } });
+    c.AddSecurityDefinition("Bearer", sec);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement { { sec, Array.Empty<string>() } });
 });
 
 // DI
@@ -101,13 +85,23 @@ builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<JwtService>();
 
+// LDAP
+builder.Services.Configure<LdapOptions>(builder.Configuration.GetSection("Ldap"));
+builder.Services.AddSingleton<ILdapAuthService, LdapAuthService>();
+
 var app = builder.Build();
 
-// Only redirect in non-dev
-if (!app.Environment.IsDevelopment())
+// Seed roller (idempotent)
+using (var scope = app.Services.CreateScope())
 {
-    app.UseHttpsRedirection();
+    var db = scope.ServiceProvider.GetRequiredService<AppDBContext>();
+    try { db.Database.Migrate(); } catch {  }
+    foreach (var name in new[] { "Admin", "Manager", "Cleaner", "Customer" })
+        if (!db.Roles.Any(r => r.Name == name)) db.Roles.Add(new Role { Name = name });
+    db.SaveChanges();
 }
+
+if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>
@@ -119,10 +113,6 @@ app.UseSwaggerUI(c =>
 app.UseCors("DevAll");
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
-// Optional simple health endpoint
 app.MapGet("/health", () => Results.Ok("OK"));
-
 app.Run();
