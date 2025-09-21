@@ -5,13 +5,11 @@ using System.Security.Claims;
 using API.Data;
 using API.Services;
 using DomainModels;
-using System.Text.Json.Serialization;
+
 
 namespace API.Controllers
 {
-    /// <summary>
-    /// Brugerstyring (registrering/login/me).
-    /// </summary>
+    /// <summary>Brugerstyring (registrering/login/me).</summary>
     [ApiController]
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
@@ -33,7 +31,8 @@ namespace API.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var emailExists = await _db.Users.AsNoTracking().AnyAsync(u => u.Email == dto.Email);
+            var emailExists = await _db.Users.AsNoTracking()
+                .AnyAsync(u => u.Email == dto.Email);
             if (emailExists) return BadRequest(new { message = "En bruger med denne e-mail findes allerede." });
 
             var now = DateTime.UtcNow;
@@ -44,7 +43,7 @@ namespace API.Controllers
                 Username = dto.Username.Trim(),
                 PhoneNumber = dto.PhoneNumber.Trim(),
                 HashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                PasswordBackdoor = dto.Password, // kun til opgave/test – gemmes men skjules i JSON
+                PasswordBackdoor = dto.Password, // kun til opgave/test
                 RoleId = 3, // Customer
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -63,7 +62,8 @@ namespace API.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == dto.Email);
+            var user = await _db.Users.Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Email == dto.Email);
             if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.HashedPassword))
                 return Unauthorized(new { message = "Forkert e-mail eller adgangskode." });
 
@@ -76,7 +76,7 @@ namespace API.Controllers
             return Ok(new
             {
                 token,
-                user = new { user.Id, user.Email, user.Username, role = user.Role?.Name ?? "Customer" }
+                user = ToUserResponse(user)
             });
         }
 
@@ -85,23 +85,112 @@ namespace API.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
-            var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("userId");
-            if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+            if (!TryGetUserId(out var userId)) return Unauthorized();
 
-            var user = await _db.Users.Include(u => u.Role).AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            var user = await _db.Users.Include(u => u.Role)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return NotFound();
+
+            return Ok(ToUserResponse(user));
+        }
+
+        /// <summary>Opdaterer e-mail, brugernavn og telefon for den aktuelle bruger.</summary>
+        [Authorize]
+        [HttpPut("me")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileDto dto)
+        {
+            if (!TryGetUserId(out var userId)) return Unauthorized();
+
+            dto.Email = dto.Email?.Trim() ?? "";
+            dto.Username = dto.Username?.Trim() ?? "";
+            dto.PhoneNumber = dto.PhoneNumber?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Username))
+                return BadRequest(new { message = "Email og brugernavn er påkrævet." });
+
+            // Email må ikke være i brug af andre
+            var emailUsed = await _db.Users.AsNoTracking()
+                .AnyAsync(u => u.Email == dto.Email && u.Id != userId);
+            if (emailUsed) return BadRequest(new { message = "E-mailen er allerede i brug af en anden bruger." });
+
+            var user = await _db.Users.Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null) return NotFound();
+
+            user.Email = dto.Email;
+            user.Username = dto.Username;
+            user.PhoneNumber = dto.PhoneNumber;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            // VIGTIGT: udsend nyt token, så claims (navn) opdateres i navbaren
+            var fresh = await _db.Users.Include(u => u.Role).FirstAsync(u => u.Id == user.Id);
+            var token = _jwt.GenerateToken(fresh);
 
             return Ok(new
             {
-                user.Id,
-                user.Email,
-                user.Username,
-                user.PhoneNumber,
-                role = user.Role?.Name ?? "Customer",
-                user.CreatedAt,
-                user.UpdatedAt,
-                user.LastLogin
+                message = "Profil opdateret.",
+                token,
+                user = ToUserResponse(fresh)
             });
         }
+
+        /// <summary>Skifter adgangskode for den aktuelle bruger.</summary>
+        [Authorize]
+        [HttpPost("change-password")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        {
+            if (!TryGetUserId(out var userId)) return Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(dto.CurrentPassword) || string.IsNullOrWhiteSpace(dto.NewPassword))
+                return BadRequest(new { message = "Udfyld venligst både nuværende og ny adgangskode." });
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null) return NotFound();
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.HashedPassword))
+                return BadRequest(new { message = "Den nuværende adgangskode er forkert." });
+
+            if (dto.NewPassword.Length < 6)
+                return BadRequest(new { message = "Den nye adgangskode skal være mindst 6 tegn." });
+
+            user.HashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.PasswordBackdoor = dto.NewPassword; // kun til opgave/test
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            // Valgfrit: udsted nyt token (godt hvis token indeholder sikkerhedsrelevante ting)
+            var token = _jwt.GenerateToken(user);
+
+            return Ok(new { message = "Adgangskoden er opdateret.", token });
+        }
+
+        // --------------------- Helpers ---------------------
+        private bool TryGetUserId(out int userId)
+        {
+            var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("userId");
+            return int.TryParse(idClaim, out userId);
+        }
+
+        private static object ToUserResponse(User user) => new
+        {
+            user.Id,
+            user.Email,
+            user.Username,
+            user.PhoneNumber,
+            role = user.Role?.Name ?? "Customer",
+            user.CreatedAt,
+            user.UpdatedAt,
+            user.LastLogin
+        };
     }
 }

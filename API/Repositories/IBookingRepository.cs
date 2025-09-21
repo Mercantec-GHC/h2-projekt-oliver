@@ -8,5 +8,7 @@ namespace API.Repositories
         Task<bool> HasOverlapAsync(int roomId, DateTimeOffset checkIn, DateTimeOffset checkOut);
         Task<IReadOnlyList<Booking>> GetAllWithUserAndRoomAsync();
         Task<IReadOnlyList<Booking>> GetByUserWithRoomAsync(int userId);
+        Task<Room?> GetRoomAsync(int roomId);
+
     }
 }

@@ -15,6 +15,8 @@ namespace API.Repositories
             _set = _db.Set<T>();
         }
 
+        // Hent via id
+
         public async Task<T?> GetByIdAsync(int id, bool asNoTracking = true)
         {
             if (asNoTracking)
@@ -23,6 +25,7 @@ namespace API.Repositories
             return await _set.FindAsync(id);
         }
 
+        // List med valgfrit filter
 
         public async Task<IReadOnlyList<T>> ListAsync(Expression<Func<T, bool>>? predicate = null, bool asNoTracking = true)
         {

@@ -3,6 +3,8 @@
 @inject Blazor.Services.APIService Api
 @inject NavigationManager Nav
 
+@* Hero – fuldskærms billede *@
+
 <section class="hero-fit">
     <img class="hero-fit__img" src="@ImgUrl("pic1.png")" alt="JoHotel – stemningsfuld lobby" />
 
@@ -21,6 +23,8 @@
         </h1>
     </div>
 </section>
+
+@* Udvalgte værelser *@
 
 <section id="featured" class="section-pad">
     <div class="container">
@@ -61,7 +65,7 @@
                             }
                             else
                             {
-                                <span class="badge no" title="Værelset er optaget">Optaget</span>
+                                <span class="badge no" title="Værelser optaget">Fuldt booket</span>
                             }
 
                             <div class="room-actions">

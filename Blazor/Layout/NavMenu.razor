@@ -3,6 +3,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager NavManager
 
+@* Topnavigation *@
+
 <header class="nav">
     <div class="nav-inner container">
         <a class="brand" href="/" aria-label="JoHotel forside">
@@ -20,6 +22,8 @@
             <span class="brand-text">JoHotel</span>
         </a>
 
+        @* Hovedlinks *@
+
         <nav class="links @(isOpen ? "open" : string.Empty)">
             <NavLink href="/" Match="NavLinkMatch.All">Forside</NavLink>
             <NavLink href="/rooms">Værelser</NavLink>
@@ -29,11 +33,12 @@
             <NavLink href="/about">Om os</NavLink>
         </nav>
 
+        @* Login/Profil + burger *@
+
         <div class="actions">
             <AuthorizeView>
                 <NotAuthorized>
                     <a class="btn-outline" href="/login">Log ind</a>
-                    <a class="btn btn-gold" href="/register">Opret</a>
                 </NotAuthorized>
 
                 <Authorized Context="auth">
@@ -46,7 +51,7 @@
                         ?? user?.Identity?.Name
                         ?? "Min profil";
                     }
-                    <a class="btn-outline" href="/booking">Book</a>
+                    <a class="btn-outline" href="/mybookings">Mine bookninger</a>
                     <a class="btn btn-gold" href="/user">@displayName</a>
                 </Authorized>
             </AuthorizeView>

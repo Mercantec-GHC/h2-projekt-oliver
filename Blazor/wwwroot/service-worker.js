@@ -1,9 +1,9 @@
-// h2booking service worker (compat, tolerant install)
+// H2 Booking service worker – simpel cache + offline-fallback
 const CACHE = 'h2booking-cache-v2';
 const ASSET_URLS = [
-    '/',               // root
+    '/',              
     '/index.html',
-    '/manifest.webmanifest',  // <-- matches your link tag
+    '/manifest.webmanifest', 
     '/favicon.png',
     '/icon-192.png',
     '/icon-512.png',
@@ -12,8 +12,10 @@ const ASSET_URLS = [
     '/Blazor.styles.css'
 ];
 
-// Helper: only same-origin requests are cached
+// Kun same-origin caches
 const sameOrigin = (url) => new URL(url).origin === self.location.origin;
+
+// Installer: cache assets (fortsæt selv ved fejl)
 
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
@@ -33,6 +35,7 @@ self.addEventListener('install', (event) => {
         await self.skipWaiting();
     })());
 });
+// Aktivér: ryd gamle caches og tag kontrol
 
 self.addEventListener('activate', (event) => {
     event.waitUntil((async () => {
@@ -42,18 +45,19 @@ self.addEventListener('activate', (event) => {
         await self.clients.claim();
     })());
 });
+// Fetch: håndter cache-strategier
 
 self.addEventListener('fetch', (event) => {
     const req = event.request;
     const url = new URL(req.url);
 
-    // Never intercept API calls
+    // Håndter aldrig /api/-kald
     if (url.pathname.startsWith('/api/')) return;
 
-    // Don’t try to cache cross-origin CDN calls (let the network handle those)
+    // Ignorer cross-origin (lad netværket tage dem)
     if (!sameOrigin(req.url)) return;
 
-    // Navigation requests: network-first with offline fallback to index.html
+    // Navigation: network-first, fallback til index.html
     if (req.mode === 'navigate') {
         event.respondWith((async () => {
             try {
@@ -68,7 +72,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // For same-origin GET requests: cache-first, then network & backfill
+    // Øvrige GET (same-origin): cache-first, derefter netværk og gem svaret til senere
     if (req.method === 'GET') {
         event.respondWith((async () => {
             const cached = await caches.match(req);
@@ -76,7 +80,6 @@ self.addEventListener('fetch', (event) => {
 
             try {
                 const res = await fetch(req);
-                // Clone and store successful responses
                 if (res && res.status === 200 && res.type === 'basic') {
                     const copy = res.clone();
                     const cache = await caches.open(CACHE);
@@ -84,7 +87,6 @@ self.addEventListener('fetch', (event) => {
                 }
                 return res;
             } catch {
-                // As a last resort, give any cached fallback if exists
                 return caches.match('/index.html');
             }
         })());

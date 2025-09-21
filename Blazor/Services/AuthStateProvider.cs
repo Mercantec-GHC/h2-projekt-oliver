@@ -3,15 +3,23 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Collections.Generic;                      // Tilføjet fra fil 1 (bruges af List<Claim>)
 using Microsoft.AspNetCore.Components.Authorization;
+using System.IdentityModel.Tokens.Jwt;               // Tilføjet fra fil 1 (bruges i BuildPrincipalFromToken)
 
 namespace Blazor.Services
 {
+    // Holder på auth tilstand baseret på JWT i TokenStorage (fra fil 1)
     public class AuthStateProvider : AuthenticationStateProvider
     {
         private readonly TokenStorage _storage;
+
+        // Tilføjet fra fil 1 - nem repræsentation af anonym bruger
+        private static readonly ClaimsPrincipal Anonymous = new(new ClaimsIdentity());
+
         public AuthStateProvider(TokenStorage storage) => _storage = storage;
 
+        // Returerer nuværende bruger udfra JWT hvis muligt (fil 2 original)
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
             var token = await _storage.GetTokenAsync();
@@ -19,6 +27,7 @@ namespace Blazor.Services
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
 
+        // Marker som logget ind og broadcast ændring (fil 2 original)
         public async Task MarkUserAsAuthenticatedAsync(string token)
         {
             await _storage.SetTokenAsync(token);
@@ -26,12 +35,18 @@ namespace Blazor.Services
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity))));
         }
 
+        // Logget ud, gemmer token hvis muligt (fil 2 original)
         public async Task MarkUserAsLoggedOutAsync()
         {
             await _storage.ClearAsync();
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
         }
 
+        // --- Tilføjet fra fil 1: wrapper metoder ---
+        public Task NotifyUserAuthentication(string token) => MarkUserAsAuthenticatedAsync(token);
+        public Task NotifyUserLogout() => MarkUserAsLoggedOutAsync();
+
+        // --- Fil 2 original: Manuel token validering og claims bygning ---
         private static ClaimsIdentity ValidateAndBuildIdentityFromToken(string? jwt)
         {
             if (string.IsNullOrWhiteSpace(jwt)) return new ClaimsIdentity();
@@ -59,6 +74,44 @@ namespace Blazor.Services
             {
                 return new ClaimsIdentity();
             }
+        }
+
+        // --- Tilføjet fra fil 1: Bygger ClaimsPrincipal ud fra JWT ---
+        private static ClaimsPrincipal BuildPrincipalFromToken(string token)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            JwtSecurityToken jwt;
+
+            try { jwt = handler.ReadJwtToken(token); }
+            catch { return Anonymous; }
+
+            var claims = new List<Claim>(jwt.Claims);
+
+            // Mapper rolle til ClaimTypes (fra fil 1)
+            foreach (var c in jwt.Claims)
+            {
+                if (c.Type.Equals("role", StringComparison.OrdinalIgnoreCase) ||
+                    c.Type.Equals("roles", StringComparison.OrdinalIgnoreCase))
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, c.Value));
+                }
+            }
+
+            // Sørger for et Navn (fra fil 1)
+            if (!claims.Any(c => c.Type == ClaimTypes.Name))
+            {
+                var name = jwt.Claims.FirstOrDefault(c =>
+                               c.Type == "username" ||
+                               c.Type == ClaimTypes.Name ||
+                               c.Type == "unique_name" ||
+                               c.Type == "name")
+                           ?.Value ?? "";
+                if (!string.IsNullOrWhiteSpace(name))
+                    claims.Add(new Claim(ClaimTypes.Name, name));
+            }
+
+            var identity = new ClaimsIdentity(claims, "jwt");
+            return new ClaimsPrincipal(identity);
         }
     }
 }

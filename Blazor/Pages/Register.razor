@@ -9,6 +9,8 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Authorization
 
+@* Registrering *@
+
 <h1>Opret konto</h1>
 
 <EditForm Model="model" OnValidSubmit="HandleRegister">
@@ -46,6 +48,8 @@
             <label for="terms">Jeg accepterer betingelserne</label>
         </div>
 
+        @* Fejl/status *@
+
         @if (!string.IsNullOrWhiteSpace(Error))
         {
             <div class="alert alert-danger">@Error</div>
@@ -68,6 +72,9 @@
     private bool Loading;
     private string? Error;
     private string Message = string.Empty;
+
+    // Enkel formularmodel
+
 
     private sealed class RegisterForm
     {
@@ -94,6 +101,9 @@
         public bool AcceptTerms { get; set; }
     }
 
+    // Submitter håndtering
+
+
     private async Task HandleRegister()
     {
         Error = null; Message = string.Empty; Loading = true;
@@ -106,7 +116,7 @@
                 return;
             }
 
-            // Opret bruger
+            // Opretter bruger
             var registerRes = await Api.RegisterAsync(new RegisterDto
                 {
                     Email = model.Email?.Trim(),
@@ -154,6 +164,8 @@
                 var loginDto = await loginRes.Content.ReadFromJsonAsync<LoginResponseDto>();
                 token = loginDto?.Token;
             }
+
+            // Ellers log ind separat
 
             if (string.IsNullOrWhiteSpace(token))
             {

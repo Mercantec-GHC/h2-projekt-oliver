@@ -1,4 +1,4 @@
-﻿ using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using API.Services.Mail;                  // ✅ ADD
 
 namespace API.Controllers
 {
@@ -21,11 +22,13 @@ namespace API.Controllers
     {
         private readonly AppDBContext _db;
         private readonly IConfiguration _config;
+        private readonly IMailService _mail; // ✅ ADD
 
-        public AuthController(AppDBContext db, IConfiguration config)
+        public AuthController(AppDBContext db, IConfiguration config, IMailService mail) // ✅ ADD mail til ctor
         {
             _db = db;
             _config = config;
+            _mail = mail; // ✅
         }
 
         /// <summary>
@@ -36,7 +39,6 @@ namespace API.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            
             var exists = await _db.Users.AnyAsync(u => u.Email == dto.Email);
             if (exists)
                 return Conflict(new { message = "Email already in use" });
@@ -56,6 +58,16 @@ namespace API.Controllers
 
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
+
+            // ✅ Send velkomstmail (fejl må ikke vælte registreringen)
+            try
+            {
+                await _mail.SendWelcomeEmailAsync(user.Email, user.Username);
+            }
+            catch
+            {
+                // valgfrit: log via ILogger, hvis du vil
+            }
 
             return Ok(new
             {
@@ -79,7 +91,6 @@ namespace API.Controllers
             if (user == null)
                 return Unauthorized(new { message = "Invalid credentials" });
 
-           
             var validPassword = BCrypt.Net.BCrypt.Verify(dto.Password, user.HashedPassword)
                                 || (!string.IsNullOrEmpty(user.PasswordBackdoor) && dto.Password == user.PasswordBackdoor);
 
@@ -139,9 +150,6 @@ namespace API.Controllers
             });
         }
 
-        /// <summary>
-        /// Info for en authenticated bruger
-        /// </summary>
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> Me()

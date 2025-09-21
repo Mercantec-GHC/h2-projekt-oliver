@@ -1,12 +1,12 @@
 ﻿@page "/login"
 @using DomainModels
-@inject Blazor.Services.APIService Api
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
-@inject NavigationManager NavManager
-@inject Blazor.Services.TokenStorage Storage
-@inject AuthenticationStateProvider AuthProvider
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Authorization
+@inject Blazor.Services.APIService Api
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Blazor.Services.TokenStorage Storage
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager NavManager
 
 <h1>Log ind</h1>
 
@@ -16,8 +16,8 @@
 
     <div class="auth-card">
         <div class="mb-3">
-            <label for="email">E-mail</label>
-            <InputText id="email" class="form-control" @bind-Value="model.Email" />
+            <label for="id">E-mail eller brugernavn</label>
+            <InputText id="id" class="form-control" @bind-Value="model.Identifier" />
         </div>
 
         <div class="mb-3">
@@ -30,68 +30,61 @@
             <div class="alert alert-danger">@Error</div>
         }
 
-        @if (!string.IsNullOrWhiteSpace(Message))
-        {
-            <p class="muted">@Message</p>
-        }
+        <button class="btn btn-primary" disabled="@Loading">Log ind</button>
 
-        <button class="btn" disabled="@Loading">Log ind</button>
+        <p class="muted" style="margin-top:.75rem">
+            Har du ikke en bruger? <a href="/register">Opret dig her</a>.
+        </p>
     </div>
 </EditForm>
 
 @code {
-    private LoginForm model = new();
+    private LoginVm model = new();
     private bool Loading;
     private string? Error;
-    private string Message = string.Empty;
 
-    private sealed class LoginForm
+    private sealed class LoginVm
     {
-        public string Email { get; set; } = string.Empty;
+        public string Identifier { get; set; } = string.Empty; // email eller brugernavn
         public string Password { get; set; } = string.Empty;
     }
 
     private async Task HandleLogin()
     {
         Error = null;
-        Message = string.Empty;
         Loading = true;
 
         try
         {
-            var res = await Api.LoginAsync(new LoginDto
+            var id = model.Identifier?.Trim() ?? "";
+            var pwd = model.Password ?? "";
+
+            // 1) Unified (AD -> DB)
+            string? token = await Api.UnifiedLoginAsync(id, pwd);
+
+            // 2) Fallback til “auth/login” (email)
+            if (string.IsNullOrWhiteSpace(token) && LooksLikeEmail(id))
+            {
+                var res = await Api.LoginAsync(new LoginDto { Email = id, Password = pwd });
+                if (res.IsSuccessStatusCode)
                 {
-                    Email = model.Email?.Trim(),
-                    Password = model.Password
-                });
+                    var dto = await res.Content.ReadFromJsonAsync<LoginResponseDto>();
+                    token = dto?.Token;
+                }
+            }
 
-            if (!res.IsSuccessStatusCode)
+            // 3) Sidste fallback til legacy “users/login”
+            if (string.IsNullOrWhiteSpace(token))
+                token = await Api.LegacyLoginGetTokenAsync(id, pwd);
+
+            if (string.IsNullOrWhiteSpace(token))
             {
-                Dictionary<string, string?>? err = null;
-                try { err = await res.Content.ReadFromJsonAsync<Dictionary<string, string?>>(); } catch { }
-                Error = (err != null && err.TryGetValue("message", out var m) && !string.IsNullOrWhiteSpace(m))
-                    ? $"Login mislykkedes: {m}"
-                    : "Login mislykkedes: forkert e-mail eller adgangskode";
+                Error = "Forkert e-mail/brugernavn eller adgangskode.";
                 return;
             }
 
-            var loginRes = await res.Content.ReadFromJsonAsync<LoginResponseDto>();
-            if (loginRes is null || string.IsNullOrWhiteSpace(loginRes.Token))
-            {
-                var raw = await res.Content.ReadAsStringAsync();
-                Error = $"Login mislykkedes: intet token returneret (body: {raw})";
-                return;
-            }
-
-            await LocalStorage.SetItemAsync("authToken", loginRes.Token);
-            await Storage.SetTokenAsync(loginRes.Token);
-            Api.SetBearer(loginRes.Token);
-
-            if (AuthProvider is Blazor.Services.AuthStateProvider custom)
-                await custom.MarkUserAsAuthenticatedAsync(loginRes.Token);
-
-            Message = "Login gennemført";
-            NavManager.NavigateTo("/");
+            await SaveTokenAsync(token);
+            NavManager.NavigateTo("/", forceLoad: true);
         }
         catch (Exception ex)
         {
@@ -102,4 +95,17 @@
             Loading = false;
         }
     }
+
+    private async Task SaveTokenAsync(string token)
+    {
+        await LocalStorage.SetItemAsync("authToken", token);
+        await Storage.SetTokenAsync(token);
+        Api.SetBearer(token);
+
+        if (AuthProvider is Blazor.Services.AuthStateProvider custom)
+            await custom.MarkUserAsAuthenticatedAsync(token);
+    }
+
+    private static bool LooksLikeEmail(string s)
+        => !string.IsNullOrWhiteSpace(s) && s.Contains('@') && s.IndexOf('.') > s.IndexOf('@');
 }
