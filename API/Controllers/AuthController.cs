@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using API.Services.Mail;                  // ✅ ADD
+using API.Services.Mail;                  //tester
 
 namespace API.Controllers
 {
@@ -22,13 +22,13 @@ namespace API.Controllers
     {
         private readonly AppDBContext _db;
         private readonly IConfiguration _config;
-        private readonly IMailService _mail; // ✅ ADD
+        private readonly IMailService _mail; 
 
-        public AuthController(AppDBContext db, IConfiguration config, IMailService mail) // ✅ ADD mail til ctor
+        public AuthController(AppDBContext db, IConfiguration config, IMailService mail) 
         {
             _db = db;
             _config = config;
-            _mail = mail; // ✅
+            _mail = mail; 
         }
 
         /// <summary>
