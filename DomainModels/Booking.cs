@@ -3,7 +3,7 @@
 namespace DomainModels;
 
 public class Booking : Common
-{
+{ //De
     [Required]
     public int UserId { get; set; }
     public User User { get; set; } = default!;
