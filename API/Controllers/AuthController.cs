@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using API.Services.Mail;                  //tester
+using API.Services.Mail;                  //tester Igen
 
 namespace API.Controllers
 {
